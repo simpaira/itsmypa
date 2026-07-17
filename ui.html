@@ -1181,7 +1181,25 @@ async function toggleRecord(){ isRecording ? await stopRecording() : await start
 
 async function startRecording(){
   if(!modelsReady){ showToast('Still finishing first-time setup — please wait a moment.','error'); return; }
-  if(IS_DESKTOP && nativeCaptureAvailable){ return startRecordingNative(); }
+  if(IS_DESKTOP){
+    // The desktop app must NEVER fall back to webview getUserMedia: WKWebView
+    // engages macOS voice processing, which mutes all other system audio for
+    // as long as the mic is open. If the native flag isn't set yet (a record
+    // click can race the first /health answer), re-check once — then either
+    // record natively or refuse with an error, but never open the webview mic.
+    if(!nativeCaptureAvailable){
+      try{
+        const d=await fetch('/health').then(r=>r.json());
+        nativeCaptureAvailable=!!d.system_audio;
+      }catch(e){}
+    }
+    if(!nativeCaptureAvailable){
+      const msg='Recording engine not ready — the native audio helper is unavailable. Try again in a moment, or reinstall if this persists.';
+      showToast(msg,'error'); setRecHint(msg);
+      return;
+    }
+    return startRecordingNative();
+  }
   let stream;
   try{
     // One button, like it should be: the mic starts instantly. Computer audio
