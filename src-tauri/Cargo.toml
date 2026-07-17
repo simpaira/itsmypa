@@ -1,0 +1,20 @@
+[package]
+name = "itsmypa"
+version = "0.1.0"
+description = "ItsMyPA — your private AI meeting PA"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+codegen-units = 1

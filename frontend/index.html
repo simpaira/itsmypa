@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ItsMyPA</title>
+<style>
+  html,body{height:100%;margin:0}
+  body{background:#F7F6F1;color:#1E1D18;font-family:-apple-system,system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;-webkit-user-select:none}
+  .mark{width:64px;height:64px;border-radius:16px;background:#C2502F;display:flex;align-items:center;
+    justify-content:center;color:#fff;box-shadow:0 10px 30px -12px rgba(194,80,47,.6)}
+  .mark svg{width:34px;height:34px}
+  h1{font-size:22px;font-weight:600;margin:0;font-family:Georgia,serif}
+  .status{font-size:13px;color:#8B8779;min-height:18px}
+  .bar{width:180px;height:3px;border-radius:3px;background:#E5E2D8;overflow:hidden}
+  .bar i{display:block;height:100%;width:40%;background:#C2502F;border-radius:3px;animation:slide 1.2s ease-in-out infinite}
+  @keyframes slide{0%{margin-left:-40%}100%{margin-left:100%}}
+</style>
+</head>
+<body>
+  <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/></svg></div>
+  <h1>ItsMyPA</h1>
+  <div class="bar"><i></i></div>
+  <div class="status" id="status">Starting your private AI…</div>
+</body>
+</html>

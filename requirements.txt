@@ -1,0 +1,19 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+python-dotenv>=1.0
+requests>=2.31
+numpy>=1.24
+llama-cpp-python>=0.2.79
+imageio-ffmpeg>=0.5   # ships a static ffmpeg so no system install is needed
+
+# read-only iCal feed support for calendar-triggered recording prompts
+icalendar>=5.0
+recurring-ical-events>=2.1
+
+# Cross-platform speech stack (ONNX Runtime — the same engine and model files
+# run on macOS/Linux/Windows/Android/iOS): Whisper ASR + Silero VAD +
+# pyannote segmentation-3.0 + TitaNet speaker embeddings.
+# Models auto-download to ./models on first run; no HF token needed.
+sherpa-onnx>=1.10.30
+platformdirs>=4.0

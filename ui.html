@@ -1,0 +1,2621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ItsMyPA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600;6..72,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --font-ui:'Inter',system-ui,-apple-system,sans-serif;
+    --font-display:'Newsreader',Georgia,'Times New Roman',serif;
+    --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+
+    --paper:#F7F6F1; --panel:#FFFFFF; --subtle:#EFEDE5; --hover:#ECEAE1;
+    --border:#E5E2D8; --border2:#D7D3C6;
+    --ink:#1E1D18; --ink2:#4F4C42; --muted:#8B8779;
+
+    --accent:#C2502F; --accent-ink:#A8401F; --accent-soft:#F6E7E0;
+    --green:#3C7A52; --green-soft:#E6F0E9;
+    --red:#B3402E; --red-soft:#F6E4E0;
+    --amber:#A97B24; --amber-soft:#F4EDDC;
+
+    --sp1:#C2502F; --sp2:#34604A; --sp3:#4A5899; --sp4:#A97B24;
+    --sp5:#7B4A99; --sp6:#2B7A8C; --sp7:#A34D68; --sp8:#5C6B3C;
+
+    --r-sm:8px; --r:12px; --r-lg:18px;
+    --shadow:0 1px 2px rgba(30,29,24,.05),0 10px 30px -14px rgba(30,29,24,.18);
+    --shadow-sm:0 1px 2px rgba(30,29,24,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--paper);color:var(--ink);font-family:var(--font-ui);font-size:14.5px;line-height:1.65;
+    -webkit-font-smoothing:antialiased}
+  ::selection{background:var(--accent-soft)}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px}
+  button,input,select,textarea{font-family:inherit}
+  button{cursor:pointer}
+  button:focus-visible,input:focus-visible,.note-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .icon svg{width:15px;height:15px;display:block}
+  .icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+  .mono{font-family:var(--font-mono)}
+
+  /* ── Shell ─────────────────────────────────────────────────────── */
+  .shell{display:flex;height:100vh;overflow:hidden}
+  .sidebar{width:292px;min-width:292px;background:var(--paper);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;overflow:hidden;transition:width .22s ease,min-width .22s ease}
+  .sidebar.collapsed{width:0;min-width:0;border-right:none}
+  .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;background:var(--paper);
+    transition:padding-right .28s ease}
+  /* The ask panel is position:fixed, so the layout can't see it — inset the
+     content by its width, otherwise the centred note just re-centres itself
+     underneath the panel and stays unreadable. */
+  body.ask-open .main{padding-right:410px}
+
+  /* ── Sidebar ───────────────────────────────────────────────────── */
+  .sidebar-header{padding:22px 18px 12px}
+  .brand-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .sidebar-collapse{background:none;border:none;color:var(--muted);cursor:pointer;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;
+    transition:background .15s,color .15s}
+  .sidebar-collapse:hover{background:var(--subtle);color:var(--ink)}
+  .sidebar-collapse svg{width:18px;height:18px}
+  .brand{font-family:var(--font-display);font-size:21px;font-weight:700;letter-spacing:-.2px;
+    display:flex;align-items:center;gap:9px;color:var(--ink)}
+  .brand-mark{width:27px;height:27px;border-radius:8px;background:var(--accent);display:flex;align-items:center;
+    justify-content:center;color:#fff}
+  .brand-mark svg{width:14px;height:14px}
+  .new-btn{margin-top:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;
+    background:var(--ink);color:var(--paper);border:none;border-radius:var(--r-sm);padding:10px 12px;
+    font-size:13px;font-weight:600;transition:opacity .15s}
+  .new-btn:hover{opacity:.85}
+  .search-row{margin-top:10px;position:relative}
+  .search-row .icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted)}
+  .search-row input{width:100%;padding:8px 10px 8px 32px;border-radius:var(--r-sm);background:var(--panel);
+    border:1px solid var(--border);color:var(--ink);font-size:13px}
+  .search-row input::placeholder{color:var(--muted)}
+  .search-row input:focus{outline:none;border-color:var(--border2)}
+
+  .notes-scroll{flex:1;overflow-y:auto;padding:8px 10px 10px}
+  .notes-group-label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.9px;
+    color:var(--muted);padding:16px 8px 6px}
+  .note-item{padding:9px 11px;border-radius:var(--r-sm);cursor:pointer;border:1px solid transparent;
+    margin-bottom:2px;transition:background .12s}
+  .note-item:hover{background:var(--hover)}
+  .note-item.active{background:var(--panel);border-color:var(--border);box-shadow:var(--shadow-sm)}
+  .note-title{font-size:13.5px;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .note-meta{font-size:11px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:6px;
+    font-family:var(--font-mono)}
+  .note-status{display:inline-flex;align-items:center;gap:6px;color:var(--accent);font-weight:600}
+  .note-status-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 1.2s infinite}
+  .new-btn:disabled{opacity:.4;cursor:not-allowed}
+  .new-btn:disabled:hover{opacity:.4}
+  .empty-notes{color:var(--muted);font-size:13px;text-align:center;padding:44px 18px;line-height:1.7}
+  .empty-notes .icon{margin:0 auto 10px;opacity:.6}
+  .empty-notes .icon svg{width:24px;height:24px}
+
+  .sidebar-footer{padding:12px 18px 14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:5px}
+  .sysrow{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
+  .sysdot{width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0}
+  .sysrow.ok .sysdot{background:var(--green)}
+  .sysrow.warn .sysdot{background:var(--amber)}
+  .settings-link{margin-top:8px;display:flex;align-items:center;gap:7px;background:none;border:none;
+    color:var(--ink2);font-size:12px;font-weight:600;padding:2px 0;transition:color .15s}
+  .settings-link:hover{color:var(--ink)}
+
+  /* ask-across-meetings */
+  /* settings + onboarding modals */
+  .set-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:9px 0}
+  .set-row label{font-size:13.5px;font-weight:550;color:var(--ink)}
+  .set-row .select{min-width:230px}
+  .set-toggle{accent-color:var(--accent);width:16px;height:16px;cursor:pointer}
+  .set-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .set-divider{border-top:1px solid var(--border);margin:12px 0}
+  .set-note{font-size:12.5px;color:var(--green);min-height:16px;margin-top:4px}
+  .set-hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+  .cal-howto{margin-top:8px;font-size:12.5px}
+  .cal-howto summary{cursor:pointer;color:var(--accent);font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:4px}
+  .cal-howto summary::before{content:'▸';font-size:10px;transition:transform .15s}
+  .cal-howto[open] summary::before{transform:rotate(90deg)}
+  .cal-howto summary::-webkit-details-marker{display:none}
+  .cal-howto-body{margin-top:10px;padding:12px 14px;background:var(--subtle);border-radius:var(--r-sm);
+    display:flex;flex-direction:column;gap:4px}
+  .cal-howto-body b{color:var(--ink);font-size:12.5px}
+  .cal-howto-body ol{margin:2px 0 10px 18px;padding:0;color:var(--ink2);line-height:1.6}
+  .cal-howto-body ol:last-child{margin-bottom:0}
+  .cal-howto-body code{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:0 4px;font-family:var(--font-mono);font-size:11.5px}
+  .onboard-body{padding:30px 32px 26px}
+  .onboard-brand .brand-mark{width:38px;height:38px;border-radius:11px;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;margin:0 auto}
+  .onboard-brand .brand-mark svg{width:19px;height:19px}
+  .onboard-title{font-family:var(--font-display);font-size:24px;font-weight:600;text-align:center;margin:14px 0 20px}
+  .onboard-step{display:flex;gap:13px;align-items:flex-start;margin-bottom:15px;font-size:13.5px;
+    line-height:1.6;color:var(--ink2)}
+  .onboard-step b{color:var(--ink)}
+  .onboard-step .icon{color:var(--accent);margin-top:3px}
+  .onboard-step .icon svg{width:17px;height:17px}
+  .onboard-actions{display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap}
+  .perm-row{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border)}
+  .perm-info{flex:1;display:flex;flex-direction:column;gap:2px}
+  .perm-info b{font-size:14px;color:var(--ink)}
+  .perm-info span{font-size:12.5px;color:var(--muted);line-height:1.5}
+  .perm-btn{flex-shrink:0;min-width:74px}
+  .perm-ok{flex-shrink:0;color:var(--green);display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600}
+  .perm-ok .icon svg{width:18px;height:18px}
+  /* iOS-style permission toggle. macOS can't revoke a grant from the app, so
+     "on" is a settled state; clicking it points the user to System Settings. */
+  .toggle{position:relative;flex-shrink:0;width:46px;height:27px;border-radius:14px;border:none;padding:0;
+    background:var(--border2);cursor:pointer;transition:background .2s}
+  .toggle::after{content:'';position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.28);transition:transform .22s cubic-bezier(.3,1.3,.5,1)}
+  .toggle.on{background:var(--green)}
+  .toggle.on::after{transform:translateX(19px)}
+  .perm-note{font-size:12.5px;color:var(--amber);min-height:18px;margin-top:12px;line-height:1.5}
+
+  /* ── Topbar ────────────────────────────────────────────────────── */
+  .topbar{padding:13px 30px;display:flex;align-items:center;gap:14px;min-height:54px}
+  .topbar-label{font-size:12.5px;color:var(--muted);font-weight:500;flex:1;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .topbar-actions{display:flex;gap:8px}
+  /* Topbar hamburger only REOPENS the sidebar — while the sidebar is open its
+     own collapse button does the job, so this stays hidden to avoid two
+     controls for one action. (.sidebar and .main are siblings.) */
+  .sidebar-toggle{display:none;align-items:center;justify-content:center;background:none;border:none;
+    color:var(--muted);padding:5px;border-radius:6px;cursor:pointer;transition:background .15s,color .15s}
+  .sidebar.collapsed ~ .main .sidebar-toggle{display:flex}
+  .sidebar-toggle:hover{background:var(--subtle);color:var(--ink)}
+
+  .btn{padding:8px 15px;border-radius:var(--r-sm);border:none;font-size:13px;font-weight:600;
+    display:inline-flex;align-items:center;gap:7px;white-space:nowrap;transition:all .15s}
+  .btn-primary{background:var(--ink);color:var(--paper)}
+  .btn-primary:hover{opacity:.85}
+  .btn-accent{background:var(--accent);color:#fff}
+  .btn-accent:hover{background:var(--accent-ink)}
+  .btn-ghost{background:transparent;color:var(--ink2);border:1px solid var(--border)}
+  .btn-ghost:hover{background:var(--panel);border-color:var(--border2)}
+  .btn-danger{background:transparent;color:var(--red);border:1px solid var(--border)}
+  .btn-danger:hover{background:var(--red-soft);border-color:var(--red)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-sm{padding:5px 11px;font-size:12px;border-radius:7px}
+
+  .content{flex:1;overflow-y:auto;padding:10px 30px 60px}
+
+  /* ── Home / recorder ───────────────────────────────────────────── */
+  .home{max-width:660px;margin:0 auto}
+  .greeting{margin:34px 0 22px;text-align:center}
+  .greeting h1{font-family:var(--font-display);font-size:34px;font-weight:600;letter-spacing:-.4px}
+  .greeting p{color:var(--muted);font-size:14px;margin-top:6px}
+  .recorder-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-lg);
+    padding:30px 32px;display:flex;flex-direction:column;align-items:center;gap:16px;box-shadow:var(--shadow);
+    transition:padding .25s}
+  .recorder-card.compact{padding:14px 22px;flex-direction:row;justify-content:space-between;gap:14px;max-width:820px;margin:0 auto}
+  .recorder-card.compact .rec-config{display:none}
+  /* #recorder-normal wraps the card's content so setup mode can swap it out;
+     it must relay the card's centered column (or compact row) layout */
+  #recorder-normal{display:flex;flex-direction:column;align-items:center;gap:16px;width:100%}
+  .recorder-card.compact #recorder-normal{flex-direction:row;justify-content:space-between;gap:14px}
+  .src-hint{font-size:12px;color:var(--muted);max-width:420px;min-height:16px;text-align:center}
+  .rec-extra{display:flex;align-items:center;gap:9px;min-height:20px;flex-wrap:wrap;justify-content:center}
+  .rec-extra-hint{font-size:11.5px;color:var(--muted)}
+  .syschip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);
+    padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--subtle)}
+  .syschip.on{color:var(--green);border-color:rgba(60,122,82,.35);background:var(--green-soft)}
+  .template-row{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  /* segmented control for the recording source (mic / computer audio / both) */
+  .segmented{display:inline-flex;background:var(--subtle);border:1px solid var(--border);border-radius:var(--r-sm);padding:2px}
+  .segmented .seg{border:none;background:none;color:var(--muted);font-size:12px;font-weight:500;
+    padding:5px 11px;border-radius:6px;cursor:pointer;transition:background .15s,color .15s}
+  .segmented .seg.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .select{padding:7px 30px 7px 11px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--panel);
+    color:var(--ink);font-size:12.5px;font-weight:500;appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238B8779' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 10px center}
+  .rec-config{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .vis-wrap{width:100%;height:52px;background:var(--subtle);border-radius:10px;overflow:hidden}
+  .recorder-card.compact .vis-wrap{width:220px;height:38px;flex-shrink:1}
+  .controls{display:flex;align-items:center;gap:16px}
+  .rec-btn{width:42px;height:42px;border-radius:50%;border:1px solid var(--border);background:var(--panel);
+    color:var(--ink2);display:flex;align-items:center;justify-content:center;transition:all .15s}
+  .rec-btn:hover:not(:disabled){border-color:var(--ink);color:var(--ink)}
+  .rec-btn:disabled{opacity:.35;cursor:not-allowed}
+  .rec-btn-main{width:60px;height:60px;background:var(--accent);border:none;color:#fff;position:relative}
+  .rec-btn-main:hover{background:var(--accent-ink)}
+  .rec-btn-main.live::before{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--accent);
+    animation:pulse-ring 1.6s ease-out infinite}
+  .recorder-card.compact .rec-btn-main{width:44px;height:44px}
+  @keyframes pulse-ring{0%{transform:scale(.9);opacity:.8}100%{transform:scale(1.4);opacity:0}}
+  .upload-link{font-size:12.5px;color:var(--muted);cursor:pointer;border-bottom:1px dashed var(--border2);
+    padding-bottom:1px;transition:color .15s}
+  .upload-link:hover{color:var(--accent)}
+  .timer{font-size:20px;font-weight:600;font-family:var(--font-mono);font-variant-numeric:tabular-nums;color:var(--ink2)}
+  .timer.recording{color:var(--accent)}
+  .rec-hint{font-size:12px;color:var(--muted);min-height:16px;text-align:center}
+
+  /* ── Session / document ────────────────────────────────────────── */
+  .doc{max-width:760px;margin:18px auto 0}
+  .doc-kicker{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;text-transform:uppercase;
+    letter-spacing:1px;color:var(--muted);margin-bottom:14px}
+  .live-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:blink 1.3s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+  .rec-standby{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.65;color:var(--muted);
+    background:var(--subtle);border-radius:var(--r);padding:16px 18px;margin-top:4px}
+  .rec-standby .icon{color:var(--accent);margin-top:2px}
+  /* compact processing strip (shown above the notes while a meeting transcribes) */
+  .proc-strip{margin-bottom:18px}
+  .proc-strip-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:9px;flex-wrap:wrap}
+  .proc-phase{font-size:13px;font-weight:600;color:var(--accent-ink)}
+  .proc-strip-hint{font-size:12px;color:var(--muted)}
+  .proc-bar{height:5px;border-radius:6px;background:var(--border);overflow:hidden}
+  .proc-bar>i{display:block;height:100%;background:var(--accent);border-radius:6px;width:0;transition:width .4s ease}
+  .proc-bar.indeterminate>i{width:35%;animation:proc-slide 1.2s ease-in-out infinite}
+  @keyframes proc-slide{0%{margin-left:-35%}100%{margin-left:100%}}
+
+  /* ── First-run setup gate (blocks recording until models are ready) ──────── */
+  .setup-panel{padding:6px 2px 10px;text-align:left}
+  .setup-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .setup-title{font-size:15px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px}
+  .setup-title .icon{color:var(--accent)}
+  .setup-pct{font-size:13px;font-weight:600;color:var(--accent-ink);font-variant-numeric:tabular-nums}
+  .setup-list{margin-top:16px;display:flex;flex-direction:column;gap:2px}
+  .setup-item{display:flex;align-items:center;gap:10px;padding:8px 4px;font-size:13.5px;color:var(--muted);
+    border-bottom:1px solid var(--border)}
+  .setup-item:last-child{border-bottom:none}
+  .setup-item .icon{width:16px;height:16px;flex-shrink:0;color:var(--border2)}
+  .setup-item .icon svg{width:16px;height:16px}
+  .setup-item-label{flex:1;color:var(--ink2)}
+  .setup-item-detail{font-size:12px;font-family:var(--font-mono);color:var(--muted);white-space:nowrap}
+  .setup-item.active{color:var(--ink)}
+  .setup-item.active .icon{color:var(--accent)}
+  .setup-item.active .setup-item-label{color:var(--ink);font-weight:600}
+  .setup-item.ok .icon{color:var(--green)}
+  .setup-item.ok .setup-item-detail{color:var(--green)}
+  .setup-item.err .icon{color:var(--red)}
+  .setup-item.err .setup-item-detail{color:var(--red)}
+  .setup-item.skip{opacity:.55}
+  .setup-hint{margin-top:16px;font-size:12px;color:var(--muted);line-height:1.55;text-align:center}
+
+  .doc-title{font-family:var(--font-display);font-size:33px;font-weight:600;letter-spacing:-.4px;line-height:1.25;
+    border:none;background:transparent;width:100%;color:var(--ink);padding:0}
+  .doc-title:focus{outline:none}
+  .doc-title::placeholder{color:var(--border2)}
+  .doc-meta{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:12px;color:var(--muted);
+    font-family:var(--font-mono);align-items:center}
+  .doc-meta .icon{margin-right:4px;vertical-align:-2px}
+  .doc-meta span{display:inline-flex;align-items:center}
+
+  .tabbar{display:flex;align-items:center;gap:2px;margin:24px 0 4px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  /* inline-flex so a tab's icon centres against its label instead of sitting
+     on the text baseline */
+  .tab{padding:9px 14px;border:none;background:transparent;font-size:13.5px;font-weight:600;color:var(--muted);
+    border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .12s;
+    display:inline-flex;align-items:center;gap:6px}
+  .tab .icon svg{width:14px;height:14px}
+  .tab:hover{color:var(--ink2)}
+  .tab.active{color:var(--ink);border-bottom-color:var(--ink)}
+  .tab-actions{margin-left:auto;display:flex;gap:7px;align-items:center;padding-bottom:6px;flex-wrap:wrap;justify-content:flex-end}
+  .status-msg{font-size:12.5px;color:var(--muted);min-height:18px;margin:10px 2px}
+  .status-msg.error{color:var(--red)}
+  .status-msg.working{color:var(--amber)}
+  .status-msg.ok{color:var(--green)}
+
+  /* notes pane */
+  .lede{font-family:var(--font-display);font-size:18.5px;line-height:1.75;color:var(--ink);margin:18px 0 6px}
+  .ai-section{margin-top:26px}
+  .ai-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);
+    display:flex;align-items:center;gap:7px;margin-bottom:10px}
+  .ai-label .count-pill{background:var(--subtle);color:var(--ink2);border-radius:20px;padding:1px 8px;
+    font-size:10.5px;font-family:var(--font-mono)}
+  .decision-list{list-style:none;display:flex;flex-direction:column;gap:9px}
+  .decision-list li{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--ink2)}
+  .decision-list li .icon{color:var(--green);margin-top:3px}
+  .action-list{display:flex;flex-direction:column}
+  .action-item{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:var(--r-sm);
+    transition:background .12s;border-bottom:1px solid var(--border)}
+  .action-item:last-child{border-bottom:none}
+  .action-item input{margin-top:4px;accent-color:var(--green);width:15px;height:15px;cursor:pointer;flex-shrink:0}
+  .action-text{font-size:14px;color:var(--ink);flex:1;line-height:1.55;min-width:60px}
+  .action-item.done .action-text{color:var(--muted);text-decoration:line-through}
+  .action-owner{font-size:10.5px;color:var(--ink2);background:var(--subtle);padding:2px 8px;border-radius:20px;
+    font-weight:600;white-space:nowrap;font-family:var(--font-mono);align-self:center}
+  .action-owner.editable:hover,.action-owner.editable:focus{background:var(--accent-soft);color:var(--accent-ink)}
+  .topic-pills{display:flex;flex-wrap:wrap;gap:7px}
+  .topic-pill{font-size:12px;padding:5px 12px;border-radius:20px;background:var(--panel);border:1px solid var(--border);
+    color:var(--ink2)}
+  .ai-empty{font-size:13px;color:var(--muted);font-style:italic}
+  /* inline-editable summary fields */
+  .editable{border-radius:6px;transition:background .12s;outline:none}
+  .lede.editable,.dec-text.editable,.action-text.editable{padding:1px 5px;margin-left:-5px;cursor:text}
+  .editable:hover{background:var(--hover)}
+  .editable:focus{background:var(--panel);box-shadow:0 0 0 1px var(--border2)}
+  .topic-pill.editable{cursor:text}
+  .raw-stream{font-size:13.5px;color:var(--ink2);white-space:pre-wrap;margin-top:14px}
+  .raw-stream strong{color:var(--ink);font-weight:600}
+
+  /* transcript pane */
+  .sp-block{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)}
+  .sp-block:last-child{border-bottom:none}
+  .sp-avatar{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;
+    justify-content:center;color:#fff;font-size:11px;font-weight:700;margin-top:2px}
+  .sp-main{flex:1;min-width:0}
+  .sp-label{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+  .sp-name{font-size:13px;font-weight:650}
+  .sp-time{font-size:10.5px;color:var(--muted);font-family:var(--font-mono)}
+  .sp-edit{margin-left:auto;opacity:0;transition:opacity .15s;color:var(--muted);background:none;border:none;padding:2px}
+  .sp-block:hover .sp-edit{opacity:1}
+  .sp-text{font-size:14.5px;line-height:1.7;color:var(--ink2);border-radius:6px;padding:1px 4px;margin-left:-4px}
+  .sp-text:hover{background:var(--hover)}
+  .sp-text:focus{outline:1px dashed var(--border2);background:var(--panel)}
+  .plain-transcript{font-size:14.5px;line-height:1.8;color:var(--ink2);white-space:pre-wrap;padding:14px 0;border-radius:6px}
+  .plain-transcript:focus{outline:1px dashed var(--border2);background:var(--panel);padding:14px}
+
+  /* scratchpad + enhanced notes */
+  .session-grid{display:grid;grid-template-columns:1fr 1.1fr;gap:24px;max-width:1100px;align-items:start}
+  @media(max-width:900px){.session-grid{grid-template-columns:1fr}}
+  .pad-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+  .result-pad{margin-top:16px}
+  .pad-head{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;
+    justify-content:space-between;gap:10px}
+  .pad-head-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);
+    display:flex;align-items:center;gap:7px}
+  .pad-hint{font-size:11px;color:var(--muted)}
+  .pad-card textarea{width:100%;border:none;background:transparent;padding:12px 14px;font-family:var(--font-ui);
+    font-size:13.5px;line-height:1.7;color:var(--ink);min-height:150px;resize:vertical;display:block}
+  .pad-card textarea:focus{outline:none}
+  .pad-card textarea::placeholder{color:var(--muted);opacity:.8}
+  .enh-wrap{border:1px solid var(--border);background:var(--panel);border-radius:var(--r);
+    padding:14px 18px 16px;margin-top:16px}
+  .enh-head{font-size:14px;font-weight:650;color:var(--ink);margin:13px 0 5px}
+  .enh-head:first-of-type{margin-top:8px}
+  .enh-bullet{font-size:13.5px;color:var(--muted);padding-left:16px;position:relative;line-height:1.65;margin-bottom:4px}
+  .enh-bullet::before{content:'–';position:absolute;left:2px;color:var(--border2)}
+
+  /* calendar record prompt */
+  #cal-prompt{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:75;background:var(--panel);
+    border:1px solid var(--accent);border-radius:24px;box-shadow:var(--shadow);padding:9px 10px 9px 16px;
+    display:flex;align-items:center;gap:11px;max-width:calc(100vw - 32px);animation:toast-in .25s ease-out}
+  #cal-prompt>.icon{color:var(--accent)}
+  .cal-text{font-size:13px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cal-text b{color:var(--ink)}
+
+  /* settings extras */
+  .set-row-stack{flex-direction:column;align-items:stretch;gap:7px}
+  .set-input{padding:9px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--paper);
+    color:var(--ink);font-size:12.5px;font-family:var(--font-mono);width:100%}
+  .set-input:focus{outline:none;border-color:var(--border2)}
+
+  /* recovery banner */
+  .recover-card{display:flex;align-items:center;gap:12px;background:var(--amber-soft);border:1px solid var(--amber);
+    border-radius:var(--r);padding:12px 16px;margin-bottom:16px}
+  .recover-card>.icon{color:var(--amber)}
+  .recover-info{flex:1;display:flex;flex-direction:column;font-size:13px;line-height:1.45}
+  .recover-info span{font-size:12px;color:var(--ink2)}
+
+
+  /* ── Chat (floating) ───────────────────────────────────────────── */
+  .rec-pill{position:fixed;left:50%;transform:translateX(-50%);top:14px;z-index:65;background:var(--accent);color:#fff;
+    border:none;border-radius:24px;padding:9px 18px;font-size:13px;font-weight:600;display:none;align-items:center;
+    gap:9px;box-shadow:var(--shadow);animation:toast-in .2s ease-out}
+  .rec-pill:hover{background:var(--accent-ink)}
+  .rec-pill .rec-pill-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:blink 1.2s infinite}
+  .rec-pill.paused .rec-pill-dot{animation:none;opacity:.6}
+  .chat-fab{position:fixed;right:26px;bottom:24px;z-index:60;background:var(--ink);color:var(--paper);border:none;
+    border-radius:24px;padding:11px 18px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:8px;
+    box-shadow:var(--shadow)}
+  .chat-fab:hover{opacity:.87}
+  /* Global "Ask your meetings" — right-side docked panel, opened by the fab. */
+  .ask-panel{position:fixed;top:0;right:0;bottom:0;z-index:70;width:410px;max-width:calc(100vw - 30px);
+    background:var(--panel);border-left:1px solid var(--border);box-shadow:-10px 0 34px -20px rgba(0,0,0,.45);
+    display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;pointer-events:none}
+  .ask-panel.open{transform:none;pointer-events:auto}
+  .ask-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px}
+  .ask-head-title{font-family:var(--font-display);font-size:16px;font-weight:600;flex:1}
+  .ask-log{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+  .ask-answer{font-size:13.5px;line-height:1.65;color:var(--ink)}
+  .ask-q-label{font-size:13px;font-weight:650;color:var(--ink);margin-top:4px}
+  .ask-src-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+  .ask-empty{color:var(--muted);font-size:12.5px;text-align:center;padding:22px 10px;line-height:1.6}
+  .chat-close{background:none;border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;
+    justify-content:center;width:30px;height:30px;border-radius:7px;transition:background .15s,color .15s}
+  .chat-close:hover{background:var(--subtle);color:var(--ink)}
+  .chat-close svg{width:19px;height:19px}
+  body.ask-open .chat-fab{display:none}
+  .chat-log{display:flex;flex-direction:column;gap:10px;min-height:110px;max-height:340px;overflow-y:auto;padding:14px}
+  #pane-chat .chat-log{max-height:none;min-height:180px;padding:16px 2px}
+  .chat-msg{padding:9px 13px;border-radius:12px;font-size:13px;line-height:1.55;max-width:88%;
+    white-space:pre-wrap;word-break:break-word}
+  .chat-msg.user{align-self:flex-end;background:var(--ink);color:var(--paper);border-bottom-right-radius:3px}
+  .chat-msg.bot{align-self:flex-start;background:var(--subtle);color:var(--ink);border-bottom-left-radius:3px}
+  .chat-empty{color:var(--muted);font-size:12px;text-align:center;padding:16px 8px}
+  .chat-input-row{display:flex;gap:8px;padding:11px 12px;border-top:1px solid var(--border)}
+  .chat-input-row input{flex:1;padding:9px 12px;border-radius:var(--r-sm);background:var(--paper);
+    border:1px solid var(--border);color:var(--ink);font-size:13px}
+  .chat-input-row input:focus{outline:none;border-color:var(--border2)}
+  #pane-chat .chat-input-row{padding:10px 0 0;border-top:none}
+
+  /* ── Email modal ───────────────────────────────────────────────── */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(30,29,24,.35);z-index:80;display:none;
+    align-items:center;justify-content:center;padding:20px}
+  .modal-backdrop.open{display:flex}
+  .modal{background:var(--panel);border-radius:var(--r-lg);box-shadow:var(--shadow);width:560px;max-width:100%;
+    max-height:82vh;display:flex;flex-direction:column;overflow:hidden}
+  .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px}
+  .modal-head-title{font-family:var(--font-display);font-size:17px;font-weight:600;flex:1}
+  /* No white-space:pre-wrap here — markup newlines/indentation between rows
+     would render as literal blank lines (they did: 46-183px phantom gaps in
+     Settings and onboarding). Only the plain-text email draft needs it. */
+  .modal-body{padding:18px 20px;overflow-y:auto;font-size:13.5px;line-height:1.7;color:var(--ink2)}
+  #email-body{white-space:pre-wrap}
+  .modal-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
+  /* ── Toasts ────────────────────────────────────────────────────── */
+  .toast-stack{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;
+    gap:8px;z-index:99;align-items:center}
+  .toast{background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:24px;font-size:13px;
+    box-shadow:var(--shadow);display:flex;align-items:center;gap:9px;animation:toast-in .2s ease-out}
+  .toast .icon{color:var(--paper)}
+  .toast.error{background:var(--red)}
+  @keyframes toast-in{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+  /* ── Motion (kept subtle; disabled for prefers-reduced-motion) ──── */
+  .ai-caveat{font-size:11.5px;color:var(--muted);margin:12px 2px 0}
+  @media(prefers-reduced-motion:no-preference){
+    .modal-backdrop.open{animation:backdrop-in .18s ease-out}
+    .modal-backdrop.open .modal{animation:modal-in .26s cubic-bezier(.21,.9,.35,1.08)}
+    @keyframes backdrop-in{from{opacity:0}to{opacity:1}}
+    @keyframes modal-in{from{transform:translateY(14px) scale(.97);opacity:0}to{transform:none;opacity:1}}
+
+    /* Onboarding panes replay this when display flips (welcome → permissions). */
+    #ob-welcome,#ob-perms{animation:pane-in .32s ease-out}
+    @keyframes pane-in{from{transform:translateX(14px);opacity:0}to{transform:none;opacity:1}}
+
+    /* "Enabled ✓" pops in when a permission lands. */
+    .perm-ok{animation:pop-in .3s cubic-bezier(.2,1.2,.4,1)}
+    @keyframes pop-in{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+
+    /* Sidebar list: staggered entrance on first render only (see renderNotesList). */
+    .stagger .note-item{animation:item-in .28s ease-out backwards}
+    .stagger .note-item:nth-child(n+2){animation-delay:.025s}
+    .stagger .note-item:nth-child(n+4){animation-delay:.05s}
+    .stagger .note-item:nth-child(n+6){animation-delay:.08s}
+    .stagger .note-item:nth-child(n+9){animation-delay:.11s}
+    .stagger .note-item:nth-child(n+12){animation-delay:.14s}
+    @keyframes item-in{from{transform:translateY(6px);opacity:0}to{transform:none;opacity:1}}
+
+    .btn,.rec-btn{transition:transform .12s ease,background .15s,border-color .15s,color .15s,opacity .15s}
+    .btn:active:not(:disabled),.rec-btn:active:not(:disabled){transform:scale(.96)}
+    .rec-btn-main:hover:not(:disabled){transform:scale(1.05)}
+    .note-item{transition:background .13s,border-color .13s}
+    .chat-fab{transition:transform .15s ease,opacity .15s}
+    .chat-fab:hover{transform:translateY(-2px)}
+    .doc,.home{animation:view-in .3s ease-out}
+    @keyframes view-in{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+  }
+
+  @media(max-width:920px){
+    .doc-title{font-size:26px}
+  }
+  @media(max-width:680px){
+    /* On phones the sidebar is an off-canvas drawer; .collapsed (desktop width:0)
+       must not apply here or it would fight the slide-in transform. */
+    .sidebar{position:fixed;z-index:100;left:-292px;top:0;bottom:0;width:292px;min-width:292px;
+      transition:left .2s;background:var(--paper)}
+    .sidebar.collapsed{width:292px;min-width:292px}
+    /* The drawer is off-canvas by default here, so the hamburger is the only
+       way back in — always show it, collapsed or not. */
+    .sidebar-toggle,.sidebar.collapsed ~ .main .sidebar-toggle{display:flex}
+    .sidebar.open{left:0;box-shadow:8px 0 30px rgba(30,29,24,.2)}
+    .content{padding:6px 16px 96px}   /* room for the Ask AI button */
+    .greeting{margin:20px 0 16px}
+    .greeting h1{font-size:26px}
+    .doc{margin-top:10px}
+    .doc-title{font-size:24px}
+    .doc-meta{gap:10px;font-size:11px}
+    .recorder-card{padding:22px 16px}
+    .tabbar{margin-top:16px}
+    .tab{padding:9px 11px}
+    .tab-actions{width:100%;margin-left:0;justify-content:flex-start;padding:6px 0 10px}
+    .set-row{flex-wrap:wrap}
+    .set-row .select{min-width:0;flex:1}
+    .topbar{padding:11px 16px}
+    .ask-panel{width:100%;max-width:100%}
+    body.ask-open .main{padding-right:0}   /* panel is full-screen here */
+    .chat-fab{right:14px}
+    #cal-prompt{flex-wrap:wrap;justify-content:center;border-radius:14px;padding:10px 12px}
+    .recover-card{flex-wrap:wrap}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand-row">
+        <div class="brand">
+          <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/></svg></div>
+          ItsMyPA
+        </div>
+        <button class="sidebar-collapse" id="sidebar-collapse-icon" onclick="toggleSidebar()" title="Hide meeting list"></button>
+      </div>
+      <button class="new-btn" id="new-btn" onclick="showRecorder()"></button>
+      <div class="search-row"><span class="icon" id="search-icon"></span><input type="text" id="note-search" placeholder="Search meetings…" oninput="renderNotesList()"></div>
+    </div>
+    <div class="notes-scroll" id="notes-list"></div>
+    <div class="sidebar-footer">
+      <div class="sysrow ok" id="sys-status"><span class="sysdot"></span>Private · on-device</div>
+      <button class="settings-link" onclick="openSettings()" id="settings-link-icon"></button>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <button class="sidebar-toggle" onclick="toggleSidebar()" id="sidebar-toggle-icon"></button>
+      <div class="topbar-label" id="view-title">New meeting</div>
+      <div class="topbar-actions" id="topbar-actions"></div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<button class="rec-pill" id="rec-pill" onclick="returnToRecording()" style="display:none"></button>
+<button class="chat-fab" id="chat-fab" onclick="toggleAskPanel()"></button>
+<div class="ask-panel" id="ask-panel">
+  <div class="ask-head"><span class="icon" id="ask-head-icon"></span><span class="ask-head-title">Ask your meetings</span>
+    <button class="chat-close" id="ask-close" onclick="closeAskPanel()" aria-label="Close" title="Close (Esc)"></button></div>
+  <div class="ask-log" id="ask-log"></div>
+  <div class="chat-input-row">
+    <input id="ask-input" type="text" placeholder="Ask across all your meetings…" onkeydown="if(event.key==='Enter')sendAsk()">
+    <button class="btn btn-primary btn-sm" id="ask-send" onclick="sendAsk()" aria-label="Send question" title="Send"></button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="settings-modal">
+  <div class="modal">
+    <div class="modal-head"><span class="icon" id="settings-icon"></span><span class="modal-head-title">Settings</span></div>
+    <div class="modal-body">
+      <div class="set-row">
+        <label for="set-model">Transcription accuracy</label>
+        <select class="select" id="set-model" onchange="checkLangModelHint()">
+          <option value="tiny">Fastest (tiny)</option>
+          <option value="base">Fast (base)</option>
+          <option value="small">Balanced (small) — recommended for English</option>
+          <option value="medium">More accurate (medium, slower)</option>
+          <option value="large-v3">Best accuracy (large-v3, slowest, ~3GB)</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <label for="set-lang">Spoken language</label>
+        <select class="select" id="set-lang" onchange="checkLangModelHint()">
+          <option value="">Auto-detect</option>
+          <option value="en">English</option><option value="es">Spanish</option>
+          <option value="fr">French</option><option value="de">German</option>
+          <option value="pt">Portuguese</option><option value="it">Italian</option>
+          <option value="nl">Dutch</option><option value="hi">Hindi</option>
+          <option value="ur">Urdu</option><option value="ar">Arabic</option>
+          <option value="zh">Chinese</option><option value="ja">Japanese</option>
+          <option value="ko">Korean</option><option value="ru">Russian</option>
+          <option value="tr">Turkish</option>
+        </select>
+      </div>
+      <div class="set-hint" id="lang-model-hint" style="display:none"></div>
+      <div class="set-row">
+        <label for="set-diarize">Identify speakers</label>
+        <input type="checkbox" id="set-diarize" class="set-toggle">
+      </div>
+      <div class="set-row">
+        <label for="set-speakers">Speakers in a typical meeting</label>
+        <select class="select" id="set-speakers">
+          <option value="-1">Detect automatically</option>
+          <option value="2">2</option><option value="3">3</option><option value="4">4</option>
+          <option value="5">5</option><option value="6">6</option><option value="8">8</option>
+        </select>
+      </div>
+      <div class="set-row set-row-stack">
+        <label for="set-calendar">Calendar (record prompts)</label>
+        <input type="url" class="set-input" id="set-calendar" placeholder="Paste your calendar’s secret iCal address (webcal:// or https://…ics)">
+        <div class="set-hint">Read-only, checked locally every 5 minutes — you’ll get a “record this meeting?” prompt when an event starts.</div>
+        <details class="cal-howto">
+          <summary>Where do I find this?</summary>
+          <div class="cal-howto-body">
+            <b>Google Calendar</b>
+            <ol>
+              <li>In the left sidebar, under "My calendars", hover your calendar name</li>
+              <li>Click the <b>⋮</b> menu next to it → <b>Settings and sharing</b></li>
+              <li>Scroll to <b>Integrate calendar</b> → copy <b>Secret address in iCal format</b></li>
+            </ol>
+            <b>Outlook.com</b>
+            <ol>
+              <li>Settings (gear icon) → <b>Calendar</b> → <b>Shared calendars</b></li>
+              <li>Under <b>Publish a calendar</b>, pick your calendar and a permission level, then click <b>Publish</b></li>
+              <li>Copy the <b>ICS</b> link (not the HTML one)</li>
+            </ol>
+            <b>Apple Calendar (iCloud)</b>
+            <ol>
+              <li>Right-click / Control-click the calendar in the sidebar → <b>Share Calendar</b></li>
+              <li>Turn on <b>Public Calendar</b> → copy the link, then change <code>webcal://</code> to <code>https://</code> if needed</li>
+            </ol>
+          </div>
+        </details>
+      </div>
+      <div class="set-note" id="settings-note"></div>
+      <div class="set-divider"></div>
+      <div class="set-row">
+        <label>Backup</label>
+        <div class="set-actions">
+          <button class="btn btn-ghost btn-sm" onclick="window.location='/export'" id="export-btn"></button>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('import-file').click()" id="import-btn"></button>
+          <input type="file" id="import-file" accept="application/json,.json" style="display:none" onchange="doImport(event)">
+        </div>
+      </div>
+      <div class="set-hint">Export downloads every meeting as one JSON file; import merges a backup without duplicating meetings.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeSettings()">Close</button>
+      <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save settings</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="onboard-modal">
+  <div class="modal">
+    <div class="modal-body onboard-body">
+      <!-- Pane 1: welcome -->
+      <div id="ob-welcome">
+        <div class="onboard-brand"><span class="brand-mark" id="onboard-mark"></span></div>
+        <h2 class="onboard-title">Welcome to ItsMyPA</h2>
+        <div class="onboard-step"><span class="icon" id="ob-i1"></span>
+          <div><b>Private by design.</b> Recording, transcription, speaker ID and AI notes all run on this device. Nothing is uploaded, ever.</div></div>
+        <div class="onboard-step"><span class="icon" id="ob-i2"></span>
+          <div><b>One button, both sides.</b> Press record and ItsMyPA captures you and everyone else on the call — Zoom, Meet, Teams, any app — automatically.</div></div>
+        <div class="onboard-step"><span class="icon" id="ob-i3"></span>
+          <div><b>Notes you can act on.</b> Decisions, action items and a follow-up email draft — and “Ask AI” answers questions from the transcript.</div></div>
+        <div class="onboard-actions">
+          <button class="btn btn-accent" onclick="goToPermissions()">Continue</button>
+        </div>
+      </div>
+      <!-- Pane 2: permissions -->
+      <div id="ob-perms" style="display:none">
+        <h2 class="onboard-title">Two quick permissions</h2>
+        <div class="perm-row">
+          <div class="perm-info"><b>Microphone</b><span>So ItsMyPA can hear you. Required to record.</span></div>
+          <button class="toggle" id="perm-mic-toggle" onclick="togglePerm('mic')" aria-label="Microphone permission"></button>
+        </div>
+        <div class="perm-row">
+          <div class="perm-info"><b>Computer audio</b><span>Captures the other people on video calls. Wear headphones on calls — otherwise their voices bleed into your mic and speaker labels get muddy. Optional — skip if you only record in person.</span></div>
+          <button class="toggle" id="perm-sys-toggle" onclick="togglePerm('sys')" aria-label="Computer audio permission"></button>
+        </div>
+        <div class="perm-note" id="perm-note"></div>
+        <div class="onboard-actions">
+          <button class="btn btn-ghost" onclick="trySample()">Explore a sample meeting</button>
+          <button class="btn btn-accent" onclick="dismissOnboard()">Start using ItsMyPA</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="email-modal">
+  <div class="modal">
+    <div class="modal-head"><span class="icon" id="email-icon"></span><span class="modal-head-title">Follow-up email</span></div>
+    <div class="modal-body" id="email-body">Drafting…</div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeEmailModal()">Close</button>
+      <button class="btn btn-primary btn-sm" id="email-copy" onclick="copyText(document.getElementById('email-body').textContent)"></button>
+    </div>
+  </div>
+</div>
+
+<!-- window.confirm() is a no-op inside the Tauri webview, so destructive
+     actions confirm through this small in-app modal instead. -->
+<div class="modal-backdrop" id="confirm-modal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-body" id="confirm-text" style="font-size:14px"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="resolveConfirm(false)">Cancel</button>
+      <button class="btn btn-accent btn-sm" id="confirm-ok" onclick="resolveConfirm(true)">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-stack" id="toast-stack"></div>
+
+<script>
+/* ───────────────────────── Icons ───────────────────────── */
+const ICONS = {
+  mic: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>`,
+  globe: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg>`,
+  micglobe: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="2.5"/><path d="M1.5 9a5 5 0 0 0 9 0"/><circle cx="17" cy="15" r="6"/><line x1="11" y1="15" x2="23" y2="15"/></svg>`,
+  square: `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>`,
+  pause: `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`,
+  play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7V5z"/></svg>`,
+  upload: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>`,
+  download: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>`,
+  copy: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>`,
+  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/></svg>`,
+  search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+  send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>`,
+  plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  checkcircle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8 12 11 15 16 9"/></svg>`,
+  users: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>`,
+  doc: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`,
+  chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`,
+  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  sparkles: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 5.4L19 9l-5.4 1.6L12 16l-1.6-5.4L5 9l5.4-1.6L12 2z"/><path d="M19 14l.7 2.3L22 17l-2.3.7L19 20l-.7-2.3L16 17l2.3-.7L19 14z"/></svg>`,
+  edit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`,
+  list: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor" stroke="none"/></svg>`,
+  inbox: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>`,
+  mail: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/></svg>`,
+  refresh: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>`,
+  gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+  panelClose: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="10" y1="4" x2="10" y2="20"/><polyline points="16 9 13.5 12 16 15"/></svg>`,
+};
+function icon(name, cls=''){ return `<span class="icon ${cls}">${ICONS[name]||''}</span>`; }
+
+document.getElementById('new-btn').innerHTML = icon('plus') + ' New meeting';
+document.getElementById('search-icon').innerHTML = ICONS.search;
+document.getElementById('sidebar-toggle-icon').innerHTML = icon('list');
+document.getElementById('sidebar-collapse-icon').innerHTML = ICONS.panelClose;
+document.getElementById('chat-fab').innerHTML = icon('sparkles') + ' Ask AI';
+document.getElementById('ask-head-icon').innerHTML = ICONS.sparkles;
+document.getElementById('ask-close').innerHTML = ICONS.close;
+document.getElementById('ask-send').innerHTML = icon('send');
+document.getElementById('email-icon').innerHTML = ICONS.mail;
+document.getElementById('email-copy').innerHTML = icon('copy') + ' Copy';
+document.getElementById('settings-icon').innerHTML = ICONS.gear;
+document.getElementById('settings-link-icon').innerHTML = icon('gear') + ' Settings';
+document.getElementById('export-btn').innerHTML = icon('download') + ' Export all meetings';
+document.getElementById('import-btn').innerHTML = icon('upload') + ' Import backup…';
+document.getElementById('onboard-mark').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/></svg>`;
+document.getElementById('ob-i1').innerHTML = ICONS.shield;
+document.getElementById('ob-i2').innerHTML = ICONS.mic;
+document.getElementById('ob-i3').innerHTML = ICONS.sparkles;
+
+/* ───────────────────────── Speaker colors ───────────────────────── */
+const SP_COLORS = ['var(--sp1)','var(--sp2)','var(--sp3)','var(--sp4)','var(--sp5)','var(--sp6)','var(--sp7)','var(--sp8)'];
+function spColor(name){
+  const n = parseInt((name||'').replace(/\D/g,'')) || 1;
+  return SP_COLORS[(n - 1) % SP_COLORS.length];
+}
+function spInitials(name){
+  const parts = (name||'').trim().split(/\s+/);
+  if(parts.length >= 2 && /^\d+$/.test(parts[1])) return 'S' + parts[1];
+  return parts.map(p=>p[0]).join('').slice(0,2).toUpperCase() || 'S';
+}
+
+/* ───────────────────────── Toasts ───────────────────────── */
+function showToast(msg, type='default'){
+  const stack = document.getElementById('toast-stack');
+  const t = document.createElement('div');
+  t.className = `toast ${type==='error'?'error':''}`;
+  const ic = type==='success' ? 'checkcircle' : type==='error' ? 'close' : 'sparkles';
+  t.innerHTML = `${icon(ic)}<span>${esc(msg)}</span>`;
+  stack.appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .25s'; setTimeout(()=>t.remove(),250); }, 2800);
+}
+
+/* ───────────────────────── State ───────────────────────── */
+let mediaRec=null, audioCtx=null, analyser=null, animFrame=null;
+let chunks=[], isRecording=false, isPaused=false;
+let startTime=0, elapsed=0, timerInterval=null;
+let curTranscript='', curSummary='', curSegments=null, curActionStatus={}, curNoteId=null;
+let curTemplate='general';
+let curScratchpad='', curEnhanced='';
+let pendingMeetingTitle='';
+let recScratchpadSnap='';   // preserves the recording's notes while viewing another meeting
+let notes=[], diarizeEnabled=false, nativeCaptureAvailable=false;
+
+// Raw mic constraints: echoCancellation/noiseSuppression/autoGainControl turn
+// on macOS voice processing, which mutes ALL other system audio while the mic
+// is open. A meeting recorder must leave playback audible.
+const MIC_RAW={echoCancellation:false,noiseSuppression:false,autoGainControl:false};
+
+// Inside the desktop shell the mic is captured NATIVELY by the audio helper —
+// WKWebView's getUserMedia engages voice processing regardless of constraints,
+// muting system audio. Browsers (e.g. a phone on the LAN) keep getUserMedia.
+const IS_DESKTOP = new URLSearchParams(location.search).has('embedded');
+
+async function micGranted(){
+  if(IS_DESKTOP){
+    try{
+      const d=await fetch('/mic/status').then(r=>r.json());
+      if(d.available) return d.state==='granted';
+    }catch(e){}
+  }
+  // Browser: trust the Permissions API when it answers; when it can't, assume
+  // granted rather than nagging with the permissions pane on every load.
+  try{
+    const s=await navigator.permissions.query({name:'microphone'});
+    return s.state!=='denied' && s.state!=='prompt';
+  }catch(e){ return true; }
+}
+
+// Screen Recording state, silently (CGPreflight via the helper). null = can't tell.
+async function sysGranted(){
+  try{
+    const d=await fetch('/system_audio/status').then(r=>r.json());
+    if(!d.available || d.state==='unknown') return null;
+    return d.state==='granted';
+  }catch(e){ return null; }
+}
+
+const TEMPLATE_OPTIONS = `
+  <option value="general">General meeting</option>
+  <option value="standup">Standup</option>
+  <option value="one_on_one">1:1</option>
+  <option value="sales">Sales / client call</option>
+  <option value="interview">Interview</option>`;
+
+async function boot(){
+  showRecorder(); maybeOnboard();
+  await loadNotes(); await checkHealth();
+  checkSetupStatus();
+  resumeActiveJob();
+  checkCalendar(); setInterval(checkCalendar, 60000);
+}
+
+async function checkHealth(){
+  try{
+    const d = await fetch('/health').then(r=>r.json());
+    const ss=document.getElementById('sys-status');
+    diarizeEnabled = d.diarize;
+    nativeCaptureAvailable = !!d.system_audio;
+    if(d.loading){
+      ss.innerHTML='<span class="sysdot"></span>Setting up…'; ss.className='sysrow warn';
+    } else if(d.asr_ready===false || !d.model_ready){
+      ss.innerHTML='<span class="sysdot"></span>'+(d.asr_ready===false?'Transcription offline':'AI notes offline');
+      ss.className='sysrow warn';
+    } else {
+      ss.innerHTML='<span class="sysdot"></span>Private · on-device';
+      ss.className='sysrow ok';
+    }
+  } catch(e){
+    document.getElementById('sys-status').innerHTML='<span class="sysdot"></span>Server unreachable';
+    document.getElementById('sys-status').className='sysrow warn';
+    setTimeout(checkHealth, 3000);   // the server may still be booting
+  }
+}
+
+/* ───────────────────────── First-run setup gate ─────────────────────────
+   Every AI model (transcription, diarization, summarizer) downloads on first
+   use rather than shipping in the installer. This polls real per-component
+   progress and refuses to let the user start a meeting until the models that
+   matter (transcription + the summarizer) are actually ready — instead of a
+   vague "warming up" spinner. */
+let modelsReady=false, setupHasError=false, setupWasBlocking=false, setupPollTimer=null;
+
+function setupPanelHTML(){
+  return `<div class="setup-panel" id="setup-panel" style="display:none">
+    <div class="setup-head">
+      <span class="setup-title">${icon('sparkles')} Setting up ItsMyPA</span>
+      <span class="setup-pct" id="setup-pct">0%</span>
+    </div>
+    <div class="proc-bar indeterminate" id="setup-bar"><i></i></div>
+    <div class="setup-list" id="setup-list"></div>
+    <div class="setup-hint">Downloading the on-device AI models — this only happens once, and needs an internet connection. Everything runs locally afterward.</div>
+  </div>`;
+}
+
+const SETUP_STATUS_LABEL = {pending:'Waiting…', downloading:'Downloading…', extracting:'Unpacking…',
+  loading:'Loading…', ready:'Ready', skipped:'Not needed', error:'Failed'};
+const SETUP_STATUS_ICON = {ready:'checkcircle', skipped:'checkcircle', error:'close'};
+
+function renderSetupComponents(components){
+  const list=document.getElementById('setup-list'); if(!list) return;
+  list.innerHTML = components.map(c=>{
+    const cls = c.status==='ready'?'ok':c.status==='error'?'err':c.status==='skipped'?'skip'
+      :(c.status==='pending'?'':'active');
+    let detail = SETUP_STATUS_LABEL[c.status] || c.status;
+    if((c.status==='downloading'||c.status==='extracting') && c.total){
+      detail = `${(c.bytes/1e6).toFixed(0)} / ${(c.total/1e6).toFixed(0)} MB`;
+    }
+    const ic = SETUP_STATUS_ICON[c.status] || 'clock';
+    return `<div class="setup-item ${cls}" title="${c.error?escAttr(c.error):''}">
+      <span class="icon">${icon(ic)}</span>
+      <span class="setup-item-label">${esc(c.label)}</span>
+      <span class="setup-item-detail">${esc(detail)}</span>
+    </div>`;
+  }).join('');
+}
+
+function applySetupVisibility(ready){
+  const sp=document.getElementById('setup-panel'), rn=document.getElementById('recorder-normal');
+  if(sp) sp.style.display = ready ? 'none' : '';
+  if(rn) rn.style.display = ready ? '' : 'none';
+}
+
+async function checkSetupStatus(){
+  clearTimeout(setupPollTimer);
+  try{
+    const d = await fetch('/setup/status').then(r=>r.json());
+    modelsReady = d.ready; setupHasError = d.has_error;
+    applySetupVisibility(d.ready);
+    if(!d.ready){
+      setupWasBlocking = true;
+      renderSetupComponents(d.components);
+      const pctEl=document.getElementById('setup-pct'); if(pctEl) pctEl.textContent = Math.round(d.overall_percent)+'%';
+      const bar=document.getElementById('setup-bar');
+      if(bar){ bar.classList.remove('indeterminate'); const i=bar.querySelector('i'); if(i) i.style.width=d.overall_percent+'%'; }
+      updateRecPill();
+      setupPollTimer = setTimeout(checkSetupStatus, 1200);
+      return;
+    }
+    updateRecPill();
+    if(setupWasBlocking){
+      setupWasBlocking=false;
+      showToast(d.has_error ? 'Setup finished, but something failed — check Settings' : 'Ready to record','success');
+      checkHealth();   // refresh sidebar/diarize/system-audio flags now models are up
+    }
+    setupPollTimer = setTimeout(checkSetupStatus, 20000);   // slow watch (e.g. after a model-tier switch)
+  }catch(e){
+    setupPollTimer = setTimeout(checkSetupStatus, 3000);
+  }
+}
+
+/* ───────────────────────── Home / recorder ───────────────────────── */
+
+function greetingWord(){
+  const h = new Date().getHours();
+  return h<12 ? 'Good morning' : h<18 ? 'Good afternoon' : 'Good evening';
+}
+
+function recorderShellHTML(){
+  const today = new Date().toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric'});
+  return `
+    <div class="home">
+      <div class="greeting">
+        <h1>${greetingWord()}</h1>
+        <p>${today} — record or upload a meeting, get notes you can act on. Everything stays on this device.</p>
+      </div>
+      <div id="recovery-banner"></div>
+      <div class="recorder-card" id="recorder-card">
+        ${setupPanelHTML()}
+        <div id="recorder-normal">
+          <div class="rec-config">
+            <div class="template-row">Capture
+              <div class="segmented" id="rec-source">
+                <button class="seg" data-src="both" onclick="setRecSource('both')">Both</button>
+                <button class="seg" data-src="mic" onclick="setRecSource('mic')">Microphone</button>
+                <button class="seg" data-src="system" onclick="setRecSource('system')">Computer audio</button>
+              </div>
+            </div>
+            <div class="template-row">Note style
+              <select class="select" id="template-select" onchange="curTemplate=this.value">${TEMPLATE_OPTIONS}</select>
+            </div>
+            <div class="src-hint" id="src-hint">🎧 Headphones recommended for video calls.</div>
+          </div>
+          <div class="vis-wrap"><canvas id="waveform" style="width:100%;height:100%"></canvas></div>
+          <div class="controls">
+            <button class="rec-btn" style="visibility:hidden"></button>
+            <button class="rec-btn rec-btn-main" id="btn-rec" onclick="toggleRecord()" title="Record" ${modelsReady?'':'disabled'}>${icon('mic')}</button>
+            <button class="rec-btn" id="btn-pause" onclick="togglePause()" disabled title="Pause">${icon('pause')}</button>
+          </div>
+          <div class="timer" id="timer">00:00</div>
+          <div class="rec-extra" id="rec-extra"></div>
+          <div class="rec-hint" id="rec-hint"></div>
+          <div class="upload-link" onclick="document.getElementById('file-input').click()">${icon('upload')} or upload an audio / video file</div>
+          <input type="file" id="file-input" accept="audio/*,video/*" style="display:none" onchange="handleFileUpload(event)">
+        </div>
+      </div>
+      <div id="session-area"></div>
+    </div>`;
+}
+
+function recordingSessionHTML(){
+  return `<div class="doc" style="max-width:760px">
+    ${scratchpadCard('Jot notes while you talk — AI expands them when the meeting ends')}
+  </div>`;
+}
+
+// Processing view: a clean progress panel, not a raw streaming transcript. The
+// finished, diarized transcript shows in the note's Transcript tab when done.
+function processingSessionHTML(scratchHint){
+  return `<div class="doc" style="max-width:820px">
+    <div class="proc-strip">
+      <div class="proc-bar indeterminate" id="proc-bar"><i></i></div>
+      <div class="proc-strip-row">
+        <span class="proc-phase" id="proc-phase">Transcribing your meeting…</span>
+        <span class="proc-strip-hint">Saves automatically — keep taking notes or come back later</span>
+      </div>
+    </div>
+    ${scratchpadCard(scratchHint || 'Jot notes while it processes — AI expands them when it\'s done')}
+  </div>`;
+}
+
+function setProcProgress(phaseText, pct){
+  const ph=document.getElementById('proc-phase'); if(ph) ph.textContent=phaseText;
+  const bar=document.getElementById('proc-bar'); const fill=bar?.querySelector('i');
+  if(bar && fill){
+    if(pct>0){ bar.classList.remove('indeterminate'); fill.style.width=pct+'%'; }
+    else bar.classList.add('indeterminate');
+  }
+}
+
+function showRecorder(){
+  if(isRecording){ returnToRecording(); return; }   // never drop an in-progress recording
+  curNoteId=null; curTranscript=''; curSummary=''; curSegments=null; curActionStatus={};
+  curEnhanced=''; pendingMeetingTitle='';
+  curScratchpad = localStorage.getItem('ms_scratchpad') || '';   // survives crashes/refreshes
+  document.getElementById('view-title').textContent='New meeting';
+  document.getElementById('topbar-actions').innerHTML='';
+  document.querySelectorAll('.note-item').forEach(el=>el.classList.remove('active'));
+  updateChatFab(); resetChat(); closeChat();
+  document.getElementById('content').innerHTML = recorderShellHTML();
+  const sel=document.getElementById('template-select'); if(sel) sel.value=curTemplate;
+  setRecSource(recSource);
+  const sc=document.querySelector('.content'); if(sc) sc.scrollTop=0;
+  applySetupVisibility(modelsReady);
+  startWaveform();
+  checkOrphanRecordings();
+  updateRecPill();
+}
+
+/* Rebuild the live recording view after the user navigated away to a saved note.
+   The recorder itself (mic stream, chunks, timer) never stopped — only the DOM
+   was replaced — so this just re-renders and re-applies the recording state. */
+function returnToRecording(){
+  // If we're re-rendering over the live recording view, capture its current
+  // notes; if we're coming back from a saved note, use the snapshot.
+  const liveSp = document.getElementById('scratchpad');
+  if(liveSp && document.getElementById('btn-rec')?.classList.contains('live')){
+    recScratchpadSnap = liveSp.value;
+  }
+  curScratchpad = recScratchpadSnap;   // restore the recording's own notes
+  curNoteId = null;
+  document.querySelectorAll('.note-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('content').innerHTML = recorderShellHTML();
+  const sel=document.getElementById('template-select'); if(sel) sel.value=curTemplate;
+  applySetupVisibility(modelsReady);
+  document.getElementById('recorder-card').classList.add('compact');
+  const btnRec=document.getElementById('btn-rec');
+  btnRec.innerHTML=icon('square'); btnRec.classList.add('live'); btnRec.title='Stop';
+  const bp=document.getElementById('btn-pause'); bp.disabled=false; bp.innerHTML=icon(isPaused?'play':'pause');
+  document.getElementById('timer').classList.add('recording'); updateTimer();
+  document.getElementById('view-title').textContent = isPaused?'Paused':'Recording…';
+  document.getElementById('session-area').innerHTML = recordingSessionHTML();
+  growPad();
+  if(sysCaptureId) renderSysChip('on');
+  startWaveform();
+  const sc=document.querySelector('.content'); if(sc) sc.scrollTop=0;
+  closeSidebar();
+  updateRecPill();
+}
+
+/* The floating "● Recording 00:00 · Return" pill: visible whenever a recording
+   is running but the recording view isn't on screen, so it's never lost. */
+function updateRecPill(){
+  const pill=document.getElementById('rec-pill'); if(!pill) return;
+  // Block starting a new meeting while one is recording, or before the
+  // required AI models have finished downloading and loading.
+  const nb=document.getElementById('new-btn');
+  if(nb){
+    nb.disabled = isRecording || !modelsReady;
+    nb.title = isRecording ? 'Finish the current recording first'
+             : !modelsReady ? 'Finishing first-time setup…' : '';
+  }
+  const rec=document.getElementById('btn-rec');
+  if(rec && !isRecording){ rec.disabled = !modelsReady; }
+  const onRecordingView = isRecording && document.getElementById('btn-rec')?.classList.contains('live');
+  if(isRecording && !onRecordingView){
+    const t=`${String(Math.floor(elapsed/60)).padStart(2,'0')}:${String(Math.floor(elapsed%60)).padStart(2,'0')}`;
+    pill.style.display='inline-flex';
+    pill.classList.toggle('paused', isPaused);
+    pill.innerHTML=`<span class="rec-pill-dot"></span>${isPaused?'Paused':'Recording'} ${t} · Return`;
+  } else {
+    pill.style.display='none';
+  }
+}
+
+/* ── Recovery of crashed/refreshed recordings ── */
+async function checkOrphanRecordings(){
+  try{
+    const list=await fetch('/recordings').then(r=>r.json());
+    const el=document.getElementById('recovery-banner');
+    if(!el) return;
+    el.innerHTML = list.map(r=>`
+      <div class="recover-card">
+        ${icon('mic')}
+        <div class="recover-info">
+          <b>Unfinished recording found</b>
+          <span>${fmtDate(r.modified)} · ${(r.bytes/1e6).toFixed(1)} MB — probably from a closed or crashed tab</span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="recoverRecording('${r.id}')">Recover</button>
+        <button class="btn btn-ghost btn-sm" onclick="discardRecording('${r.id}')">Discard</button>
+      </div>`).join('');
+  }catch(e){}
+}
+
+async function recoverRecording(id){
+  try{
+    const r=await fetch(`/recordings/${id}/recover`,{method:'POST'});
+    if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(e.detail||'Could not recover the recording'); }
+    const {job_id}=await r.json();
+    document.getElementById('recovery-banner')?.replaceChildren();
+    // Create a meeting for the recovered recording, then process it like any other.
+    const noteRes=await fetch('/notes',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title:'', status:'processing', transcript:''})});
+    const note=await noteRes.json();
+    activeJobs[note.id]=job_id;
+    localStorage.setItem('ms_active_job', JSON.stringify({job_id, noteId:note.id}));
+    await loadNotes();
+    viewNote(note.id);
+    finishProcessing(note.id, job_id, '', curTemplate);
+  }catch(e){ showToast(e.message,'error'); }
+}
+
+async function discardRecording(id){
+  if(!await appConfirm('Discard this unfinished recording? The audio will be deleted.','Discard'))return;
+  await fetch(`/recordings/${id}`,{method:'DELETE'});
+  checkOrphanRecordings();
+}
+
+function setRecHint(msg){ const el=document.getElementById('rec-hint'); if(el) el.textContent=msg; }
+
+/* ───────────────────────── Waveform ───────────────────────── */
+let waveData=new Array(80).fill(0);
+function startWaveform(){
+  const canvas=document.getElementById('waveform'); if(!canvas)return;
+  const ctx2=canvas.getContext('2d');
+  function draw(){
+    if(!canvas.parentElement){ if(animFrame) cancelAnimationFrame(animFrame); return; }
+    canvas.width=canvas.offsetWidth; canvas.height=canvas.offsetHeight;
+    const w=canvas.width,h=canvas.height,barW=3,gap=2,n=Math.floor(w/(barW+gap));
+    ctx2.clearRect(0,0,w,h);
+    for(let i=0;i<n;i++){
+      if(analyser){const a=new Uint8Array(analyser.frequencyBinCount);analyser.getByteFrequencyData(a);waveData[i%waveData.length]=a[Math.floor(i*a.length/n)]/255;}
+      const amp=waveData[i%waveData.length]*(h*.8)||(Math.sin(i*.4+Date.now()*.001)*3+4);
+      ctx2.fillStyle=isRecording&&!isPaused?'#C2502F':'#D7D3C6';
+      ctx2.beginPath();ctx2.roundRect(i*(barW+gap),(h-amp)/2,barW,Math.max(amp,3),2);ctx2.fill();
+    }
+    animFrame=requestAnimationFrame(draw);
+  }
+  if(animFrame)cancelAnimationFrame(animFrame); draw();
+}
+
+/* ───────────────────────── Recording ───────────────────────── */
+async function toggleRecord(){ isRecording ? await stopRecording() : await startRecording(); }
+
+async function startRecording(){
+  if(!modelsReady){ showToast('Still finishing first-time setup — please wait a moment.','error'); return; }
+  if(IS_DESKTOP && nativeCaptureAvailable){ return startRecordingNative(); }
+  let stream;
+  try{
+    // One button, like it should be: the mic starts instantly. Computer audio
+    // (for headphone video calls) is added with one click while recording.
+    // MIC_RAW keeps macOS voice processing off so system audio stays audible.
+    try{ stream=await navigator.mediaDevices.getUserMedia({audio:MIC_RAW,video:false}); }
+    catch(e){ throw new Error('Microphone unavailable — check browser permissions for this site.'); }
+    audioCtx=new AudioContext(); analyser=audioCtx.createAnalyser(); analyser.fftSize=256;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+
+    resetSysCapture();
+    const mimeType=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg','audio/mp4']
+      .find(t=>MediaRecorder.isTypeSupported(t))||'';
+    mediaRec=new MediaRecorder(stream,mimeType?{mimeType}:{});
+    chunks=[];
+    mediaRec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+    mediaRec.onstop=async ()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      if(sysStopPromise) await sysStopPromise;   // wait for the system recorder to flush
+      processAudio(new Blob(chunks,{type:mimeType||'audio/webm'}));
+    };
+    stream.getAudioTracks()[0]?.addEventListener('ended',()=>{if(isRecording)stopRecording();});
+    mediaRec.start(500);
+
+    // Crash safety: stream chunks to the server every few seconds, so a tab
+    // crash or accidental refresh mid-recording can be recovered.
+    recSessionId = crypto.randomUUID();
+    backupIdx = 0; backupBusy = false;
+    backupInterval = setInterval(backupChunks, 8000);
+
+    beginRecordingUI();
+  } catch(e){
+    releaseStream(stream);   // a leaked live mic would keep system audio muted
+    showToast(e.message,'error'); setRecHint(e.message);
+  }
+}
+
+/* Desktop path: the native helper records the mic — no webview capture, no
+   macOS voice processing, so the rest of the system stays audible. The WAV
+   lives on the server's disk from the first buffer (inherent crash safety). */
+let micCaptureId=null, micLevelInterval=null, micLevelIdx=0, nativeRecording=false;
+
+// What to capture: 'both' (mic + computer audio), 'mic' (microphone only),
+// 'system' (computer audio only — e.g. a video playing, no mic).
+let recSource = localStorage.getItem('ms_rec_source') || 'both';
+function setRecSource(s){
+  if(isRecording) return;
+  recSource=s; localStorage.setItem('ms_rec_source', s);
+  document.querySelectorAll('#rec-source .seg').forEach(b=>b.classList.toggle('on', b.dataset.src===s));
+  const hint=document.getElementById('src-hint');
+  if(hint) hint.textContent = s==='mic' ? 'Recording your microphone only.'
+    : s==='system' ? 'Recording computer audio only — no microphone.'
+    : '🎧 Headphones recommended for video calls.';
+}
+
+async function startRecordingNative(){
+  try{
+    micCaptureId=null; nativeRecording=true;
+    resetSysCapture();
+    if(recSource!=='system'){
+      const r=await fetch('/mic/start',{method:'POST'});
+      if(!r.ok){
+        const e=await r.json().catch(()=>({}));
+        throw new Error(e.detail||'Could not start the microphone.');
+      }
+      micCaptureId=(await r.json()).capture_id;
+      // Live waveform from the helper's RMS level lines.
+      micLevelIdx=0;
+      micLevelInterval=setInterval(async ()=>{
+        if(!micCaptureId) return;
+        try{
+          const d=await fetch(`/mic/level/${micCaptureId}`).then(x=>x.json());
+          waveData[micLevelIdx++%waveData.length]=d.level;
+        }catch(e){}
+      },120);
+    }
+    beginRecordingUI();
+  } catch(e){ nativeRecording=false; showToast(e.message,'error'); setRecHint(e.message); }
+}
+
+function beginRecordingUI(){
+  isRecording=true; isPaused=false; startTime=Date.now(); elapsed=0;
+  recScratchpadSnap = curScratchpad;
+  timerInterval=setInterval(updateTimer,500);
+  const btnRec=document.getElementById('btn-rec');
+  btnRec.innerHTML=icon('square'); btnRec.classList.add('live'); btnRec.title='Stop';
+  document.getElementById('btn-pause').disabled=false;
+  document.getElementById('timer').classList.add('recording');
+  document.getElementById('recorder-card').classList.add('compact');
+  document.getElementById('view-title').textContent='Recording…';
+  setRecHint('');
+
+  document.getElementById('session-area').innerHTML = recordingSessionHTML();
+  document.getElementById('scratchpad')?.focus();
+  growPad();
+  setStatus('Recording…','working');
+  if(recSource!=='mic') startSystemCapture();   // computer-audio channel
+}
+
+/* ── Computer-audio channel (native system-audio tap) ──
+   Captured automatically on every recording. The mic is "You"; the computer
+   audio is everyone else. If the meeting turns out to be in-person (nothing
+   played through the computer), the engine falls back to normal diarization. */
+let sysOffsetSec=0, sysStopPromise=null, sysCaptureId=null;
+
+function resetSysCapture(){ sysOffsetSec=0; sysStopPromise=null; sysCaptureId=null; }
+
+function renderSysChip(state){
+  const el=document.getElementById('rec-extra'); if(!el) return;
+  if(state==='on'){
+    el.innerHTML=`<span class="syschip on">${icon('globe')} Computer audio on</span>`;
+  } else el.innerHTML='';
+}
+
+// The desktop app taps system audio directly (ScreenCaptureKit) — no tab dialog,
+// hears every app. If Screen Recording permission is missing we quietly stay
+// mic-only and hint once, rather than blocking the recording.
+let sysPermissionHinted=false;
+async function startSystemCapture(){
+  if(!nativeCaptureAvailable || sysCaptureId) return;
+  try{
+    const off=elapsed;
+    const r=await fetch('/system_audio/start',{method:'POST'});
+    if(!r.ok){
+      if(r.status===403 && !sysPermissionHinted){
+        sysPermissionHinted=true;
+        showToast('Recording your mic. Enable computer audio in Settings to also capture video-call audio.','');
+      }
+      return;   // mic-only, no drama
+    }
+    const d=await r.json();
+    sysCaptureId=d.capture_id;
+    sysOffsetSec=off;
+    renderSysChip('on');
+    setStatus('Recording you + computer audio…','working');
+  }catch(e){ /* stay mic-only */ }
+}
+
+/* ── Crash-safe chunk backups ── */
+let recSessionId=null, backupIdx=0, backupBusy=false, backupInterval=null;
+
+async function backupChunks(){
+  if(backupBusy || !recSessionId || chunks.length<=backupIdx) return;
+  backupBusy=true;
+  try{
+    const end=chunks.length;
+    const fd=new FormData();
+    fd.append('audio', new Blob(chunks.slice(backupIdx,end), {type:mediaRec.mimeType}), 'chunk.webm');
+    const r=await fetch(`/recordings/${recSessionId}/chunk`, {method:'POST', body:fd});
+    if(r.ok) backupIdx=end;
+  }catch(e){}
+  finally{ backupBusy=false; }
+}
+
+function finishBackup(){
+  if(!recSessionId) return;
+  fetch(`/recordings/${recSessionId}/finish`,{method:'POST'}).catch(()=>{});
+  recSessionId=null;
+}
+
+async function stopRecording(){
+  clearInterval(timerInterval);
+  if(backupInterval){ clearInterval(backupInterval); backupInterval=null; }
+  if(micLevelInterval){ clearInterval(micLevelInterval); micLevelInterval=null; waveData.fill(0); }
+  isRecording=false; isPaused=false;
+  if(sysCaptureId){
+    // Stop the native helper and wait for its WAV to finalize before uploading.
+    const id=sysCaptureId;
+    sysStopPromise=fetch('/system_audio/stop',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({capture_id:id})}).catch(()=>{});
+  }
+  renderSysChip('');
+  const btnRec = document.getElementById('btn-rec');
+  if(btnRec){ btnRec.innerHTML = icon('mic'); btnRec.classList.remove('live'); }
+  const bp=document.getElementById('btn-pause'); if(bp) bp.disabled=true;
+  document.getElementById('timer')?.classList.remove('recording');
+  updateRecPill();   // recording ended — hide the floating pill
+
+  if(nativeRecording){
+    // Native path: finalize the helper WAV(s), then hand their ids to
+    // /transcribe. Works for mic, computer-audio-only, or both.
+    if(micCaptureId){
+      await fetch('/mic/stop',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({capture_id:micCaptureId})}).catch(()=>{});
+    }
+    if(sysStopPromise) await sysStopPromise;
+    nativeRecording=false;
+    processAudio(null);
+  } else {
+    mediaRec?.stop(); mediaRec?.stream?.getTracks().forEach(t=>t.stop());
+    audioCtx?.close(); audioCtx=null; analyser=null;
+  }
+}
+
+function togglePause(){
+  if(!isRecording) return;
+  const btn = document.getElementById('btn-pause');
+  if(isPaused){
+    if(micCaptureId) fetch('/mic/resume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({capture_id:micCaptureId})}).catch(()=>{});
+    else if(mediaRec) mediaRec.resume(); else return;
+    isPaused=false; startTime=Date.now()-elapsed*1000; timerInterval=setInterval(updateTimer,500); btn.innerHTML=icon('pause'); setStatus('Recording…','working');
+  } else {
+    if(micCaptureId) fetch('/mic/pause',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({capture_id:micCaptureId})}).catch(()=>{});
+    else if(mediaRec) mediaRec.pause(); else return;
+    isPaused=true; clearInterval(timerInterval); btn.innerHTML=icon('play'); setStatus('Paused','');
+  }
+}
+
+function updateTimer(){
+  elapsed=(Date.now()-startTime)/1000;
+  const el=document.getElementById('timer');
+  if(el) el.textContent=`${String(Math.floor(elapsed/60)).padStart(2,'0')}:${String(Math.floor(elapsed%60)).padStart(2,'0')}`;
+  updateRecPill();   // keep the floating pill's timer live while navigated away
+}
+
+function handleFileUpload(e){ const f=e.target.files[0]; if(f)processAudio(f); }
+
+/* ───────────────────────── Processing ───────────────────────── */
+let activeJobs = {};   // noteId -> job_id for meetings currently processing
+
+async function patchNote(id, fields){
+  try{
+    await fetch(`/notes/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(fields)});
+    const n=notes.find(x=>x.id===id); if(n) Object.assign(n, fields);
+  }catch(e){}
+}
+
+// Drain a streaming text endpoint fully into a string (no DOM dependency), so
+// the pipeline works even when the user has navigated to another meeting.
+async function fetchStream(url, body){
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok) throw new Error('request failed');
+  const reader=r.body.getReader(), dec=new TextDecoder(); let out='';
+  while(true){ const {value,done}=await reader.read(); if(done) break; out+=dec.decode(value); }
+  return out;
+}
+
+function reRenderNote(id){ if(curNoteId===id) viewNote(id); }
+
+// A failed or empty meeting is only worth keeping if the user typed notes in it.
+async function discardOrKeepFailed(noteId, scratch){
+  if(!(scratch||'').trim()){
+    try{ await fetch(`/notes/${noteId}`,{method:'DELETE'}); }catch(e){}
+    await loadNotes();
+    if(curNoteId===noteId) showRecorder();
+  } else {
+    await patchNote(noteId,{status:'ready'}); await loadNotes(); reRenderNote(noteId);
+  }
+}
+
+async function processAudio(blob){
+  const scratch = document.getElementById('scratchpad')?.value ?? curScratchpad;
+  const template = curTemplate;
+  const title = pendingMeetingTitle || '';
+  const dur = Math.round(elapsed) || 0;
+  finishBackup();
+
+  // Create the meeting immediately so it's saved and shown in the sidebar with
+  // a live status — navigating to another meeting can never lose it.
+  let note;
+  try{
+    const r=await fetch('/notes',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title, status:'processing', scratchpad:scratch, duration:dur, transcript:''})});
+    note=await r.json();
+  }catch(e){ showToast('Could not save the meeting — is the server running?','error'); return; }
+
+  localStorage.removeItem('ms_scratchpad');
+  pendingMeetingTitle='';
+  await loadNotes();
+  viewNote(note.id);                                  // shows the processing view
+  processMeeting(note.id, blob, template, scratch);   // background — not awaited
+}
+
+// Full pipeline, keyed by note id (not shared globals) so it completes even if
+// the user is looking at a different meeting while it runs.
+async function processMeeting(noteId, blob, template, scratch){
+  const fd=new FormData();
+  if(micCaptureId){ fd.append('mic_capture_id',micCaptureId); micCaptureId=null; }
+  else if(blob) fd.append('audio',blob,'audio.webm');
+  if(sysCaptureId){ fd.append('system_capture_id',sysCaptureId); fd.append('system_offset',String(sysOffsetSec)); }
+  resetSysCapture();
+  try{
+    const r=await fetch('/transcribe',{method:'POST',body:fd});
+    if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(e.detail||'Transcription failed'); }
+    const {job_id}=await r.json();
+    activeJobs[noteId]=job_id;
+    localStorage.setItem('ms_active_job', JSON.stringify({job_id, noteId}));
+    await finishProcessing(noteId, job_id, scratch, template);
+  }catch(e){
+    delete activeJobs[noteId]; localStorage.removeItem('ms_active_job');
+    await discardOrKeepFailed(noteId, scratch);
+    showToast(e.message||'Processing failed','error');
+  }
+}
+
+// From a running job → a finished note. Reused on reconnect after a refresh.
+async function finishProcessing(noteId, job_id, scratch, template){
+  let d;
+  try{ d=await pollJob(job_id); }
+  catch(e){
+    delete activeJobs[noteId]; localStorage.removeItem('ms_active_job');
+    await discardOrKeepFailed(noteId, scratch);
+    showToast(e.message,'error'); return;
+  }
+  delete activeJobs[noteId]; localStorage.removeItem('ms_active_job');
+
+  const transcript=d.transcript||'', segments=d.segments||null;
+  if(!transcript){
+    await discardOrKeepFailed(noteId, scratch);
+    showToast((scratch||'').trim() ? 'No speech detected — kept your typed notes.'
+                                   : 'No speech detected — the empty meeting was discarded.','error');
+    return;
+  }
+  await patchNote(noteId,{transcript, segments});
+
+  if((scratch||'').trim()){
+    setProcProgress('Enhancing your notes…',100);
+    try{ const enhanced=await fetchStream('/enhance',{transcript,notes:scratch}); await patchNote(noteId,{enhanced}); }catch(e){}
+  }
+  setProcProgress('Writing your meeting notes…',100);
+  try{ const summary=await fetchStream('/summarize',{transcript,template:template||'general'}); await patchNote(noteId,{summary}); }catch(e){}
+  const cur=notes.find(x=>x.id===noteId);
+  if(!cur || !cur.title){
+    try{ const t=await fetch('/generate/title',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript:transcript.slice(0,6000)})}).then(x=>x.json()); if(t.title) await patchNote(noteId,{title:t.title}); }catch(e){}
+  }
+  await patchNote(noteId,{status:'ready'});
+  await loadNotes(); reRenderNote(noteId);
+}
+
+/* On page load, reconnect to a meeting that was still processing. */
+async function resumeActiveJob(){
+  const raw = localStorage.getItem('ms_active_job');
+  if(!raw) return;
+  let job_id, noteId;
+  try{ const p=JSON.parse(raw); job_id=p.job_id; noteId=p.noteId; }catch(e){ localStorage.removeItem('ms_active_job'); return; }
+  if(!job_id || !noteId){ localStorage.removeItem('ms_active_job'); return; }
+  let j=null;
+  try{ const r=await fetch(`/jobs/${job_id}`); if(r.ok) j=await r.json(); }catch(e){}
+  if(!j){ localStorage.removeItem('ms_active_job'); await patchNote(noteId,{status:'ready'}); await loadNotes(); return; }
+  const note=notes.find(x=>x.id===noteId);
+  activeJobs[noteId]=job_id;
+  finishProcessing(noteId, job_id, note?.scratchpad||'', curTemplate);
+}
+
+/* Poll a transcription job until it finishes. Transient fetch failures (laptop
+   nap, wifi blip) are retried forever — the job keeps running server-side. */
+async function pollJob(id){
+  const phaseLabels={queued:'Waiting for transcriber…',converting:'Preparing audio…',
+    transcribing:'Transcribing…',diarizing:'Identifying speakers…',finalizing:'Finalizing…'};
+  while(true){
+    await new Promise(res=>setTimeout(res,1500));
+    let j;
+    try{
+      const r=await fetch(`/jobs/${id}`);
+      if(r.status===404) throw {fatal:true, message:'Transcription job was lost — is the server restarting?'};
+      if(!r.ok) continue;
+      j=await r.json();
+    } catch(e){ if(e.fatal) throw new Error(e.message); continue; }
+
+    if(j.status==='done') return j;
+    if(j.status==='error'){
+      if(j.transcript){ showToast('Transcription failed partway — showing partial transcript','error'); return j; }
+      throw new Error(j.error||'Transcription failed');
+    }
+    const pct=j.progress>0?Math.round(j.progress*100):0;
+    const phase=phaseLabels[j.phase]||'Processing…';
+    setStatus(phase+(pct?` ${pct}%`:''),'working');
+    setProcProgress(phase, pct);
+  }
+}
+
+/* ───────────────────────── Result document ───────────────────────── */
+function buildResultView(o){
+  // o: {saved, noteId, title, dateIso, duration}
+  const wordCount = curTranscript.trim() ? curTranscript.trim().split(/\s+/).length : 0;
+  const spCount = curSegments ? [...new Set(curSegments.map(s=>s.speaker))].length : 0;
+  const dur = o.duration || Math.round(elapsed) || (curSegments&&curSegments.length ? Math.round(curSegments[curSegments.length-1].end) : 0);
+  const dateStr = fmtDate(o.dateIso || new Date().toISOString());
+
+  document.getElementById('content').innerHTML=`
+    <div class="doc">
+      <div class="doc-head">
+        <input id="note-title" class="doc-title" placeholder="Untitled meeting" value="${escAttr(o.title||pendingMeetingTitle||'')}"
+          ${o.saved?`onchange="patchTitle('${o.noteId}')"`:''}>
+        <div class="doc-meta">
+          <span>${icon('clock')}${dateStr}</span>
+          ${dur?`<span>${icon('mic')}${fmtDur(dur)}</span>`:''}
+          <span>${icon('doc')}${wordCount} words</span>
+          ${spCount?`<span>${icon('users')}${spCount} speakers</span>`:''}
+        </div>
+      </div>
+      <div class="tabbar">
+        <button class="tab active" id="tab-btn-notes" onclick="switchTab('notes')">Notes</button>
+        <button class="tab" id="tab-btn-transcript" onclick="switchTab('transcript')">Transcript</button>
+        ${curTranscript ? `<button class="tab" id="tab-btn-chat" onclick="switchTab('chat')">${icon('sparkles')} Ask AI</button>` : ''}
+        <div class="tab-actions">
+          <select class="select" id="template-select" onchange="curTemplate=this.value" title="Note style">${TEMPLATE_OPTIONS}</select>
+          <button class="btn btn-ghost btn-sm" onclick="regenerateNotes()" title="Regenerate notes with the selected style">${icon('refresh')} Regenerate</button>
+          <button class="btn btn-ghost btn-sm" onclick="openEmailModal()">${icon('mail')} Follow-up</button>
+        </div>
+      </div>
+      <div class="status-msg" id="status"></div>
+      <div id="pane-notes">
+        <div class="pad-card result-pad">
+          <div class="pad-head">
+            <span class="pad-head-label">${icon('edit')} My notes</span>
+            <button class="btn btn-ghost btn-sm" onclick="runEnhance()">${icon('sparkles')} Enhance with AI</button>
+          </div>
+          <textarea id="scratchpad" spellcheck="false" oninput="scratchSave(this)"
+            placeholder="Type or paste your own rough notes, then hit Enhance — AI expands each line with details from the transcript.">${esc(curScratchpad)}</textarea>
+        </div>
+        <div id="enhanced-box"></div>
+        <div id="summary-box"></div>
+        <div class="ai-caveat">AI-generated — double-check names, numbers, and dates against the transcript.</div>
+      </div>
+      <div id="pane-transcript" style="display:none">
+        <div style="display:flex;justify-content:flex-end;margin-top:10px">
+          <button class="btn btn-ghost btn-sm" onclick="copyText(curTranscript)">${icon('copy')} Copy transcript</button>
+        </div>
+        <div id="transcript-box"></div>
+        <div class="ai-caveat">Speaker labels are AI estimates — similar voices or crosstalk can blur them.</div>
+      </div>
+      <div id="pane-chat" style="display:none">
+        <div class="chat-log" id="chat-log" aria-live="polite"></div>
+        <div class="chat-input-row">
+          <input id="chat-input" type="text" placeholder="e.g. what did we decide about the launch?" onkeydown="if(event.key==='Enter')sendChat()">
+          <button class="btn btn-primary btn-sm" id="chat-send" onclick="sendChat()">${icon('send')}</button>
+        </div>
+        <div class="ai-caveat">Answers come only from this meeting's transcript.</div>
+      </div>
+    </div>`;
+  const sel=document.getElementById('template-select'); if(sel) sel.value=curTemplate;
+  document.getElementById('view-title').textContent = o.saved ? (o.title||'Meeting note') : 'New meeting note';
+
+  const ta=document.getElementById('topbar-actions');
+  ta.innerHTML = o.saved ? `
+    <button class="btn btn-ghost btn-sm" onclick="exportNote('${o.noteId}')">${icon('download')} Export</button>
+    <button class="btn btn-danger btn-sm" onclick="deleteNote('${o.noteId}')">${icon('trash')} Delete</button>` : '';
+  growPad();
+  const sc=document.querySelector('.content'); if(sc) sc.scrollTop=0;
+}
+
+function switchTab(name){
+  document.getElementById('tab-btn-notes')?.classList.toggle('active',name==='notes');
+  document.getElementById('tab-btn-transcript')?.classList.toggle('active',name==='transcript');
+  document.getElementById('tab-btn-chat')?.classList.toggle('active',name==='chat');
+  const pn=document.getElementById('pane-notes'), pt=document.getElementById('pane-transcript'), pc=document.getElementById('pane-chat');
+  if(pn) pn.style.display = name==='notes'?'':'none';
+  if(pt) pt.style.display = name==='transcript'?'':'none';
+  if(pc) pc.style.display = name==='chat'?'':'none';
+  if(name==='chat') document.getElementById('chat-input')?.focus();
+}
+
+/* ───────────────────────── Transcript rendering ───────────────────────── */
+function renderTranscript(id, plain, segments){
+  const el=document.getElementById(id); if(!el)return;
+  if(!segments || !segments.length){
+    el.innerHTML=`<div class="plain-transcript" contenteditable="plaintext-only" spellcheck="false"
+      title="Click to edit" onblur="editPlainTranscript(this)">${esc(plain)}</div>`;
+    return;
+  }
+  el.innerHTML = segments.map((seg,i)=>{
+    const col=spColor(seg.speaker);
+    return `<div class="sp-block">
+      <div class="sp-avatar" style="background:${col}">${esc(spInitials(seg.speaker))}</div>
+      <div class="sp-main">
+        <div class="sp-label">
+          <span class="sp-name" style="color:${col}">${esc(seg.speaker)}</span>
+          <span class="sp-time">${fmtTimeSec(seg.start)}</span>
+          <button class="sp-edit" onclick="renameSpeaker('${esc(seg.speaker)}')" title="Rename speaker">${icon('edit')}</button>
+        </div>
+        <div class="sp-text" contenteditable="plaintext-only" spellcheck="false" title="Click to edit"
+          onblur="editSegmentText(${i}, this)">${esc(seg.text)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* Fix mis-transcriptions in place; edits on saved notes persist to disk. */
+function editSegmentText(i, el){
+  const t = el.textContent.trim();
+  if(!curSegments || !curSegments[i] || curSegments[i].text === t) return;
+  curSegments[i].text = t;
+  curTranscript = curSegments.map(s => `[${s.speaker} ${fmtTimeSec(s.start)}] ${s.text}`).join('\n\n');
+  persistTranscript();
+}
+
+function editPlainTranscript(el){
+  const t = el.textContent.trim();
+  if(t === curTranscript) return;
+  curTranscript = t;
+  persistTranscript();
+}
+
+async function persistTranscript(){
+  if(!curNoteId) return;   // unsaved session — cur state is enough
+  try{
+    await fetch(`/notes/${curNoteId}`, {method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({transcript: curTranscript, segments: curSegments})});
+    const n = notes.find(x=>x.id===curNoteId);
+    if(n){ n.transcript=curTranscript; n.segments=curSegments; }
+    showToast('Transcript updated','success');
+  }catch(e){ showToast('Could not save the edit','error'); }
+}
+
+function renameSpeaker(oldName){
+  const newName = prompt(`Rename all occurrences of "${oldName}" to:`, oldName);
+  if (!newName || newName === oldName) return;
+  if (curSegments) {
+    curSegments.forEach(s => { if (s.speaker === oldName) s.speaker = newName; });
+    curTranscript = curSegments.map(s => `[${s.speaker} ${fmtTimeSec(s.start)}] ${s.text}`).join('\n\n');
+  }
+  renderTranscript('transcript-box', curTranscript, curSegments);
+  persistTranscript();
+}
+
+function fmtTimeSec(s){ return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
+
+/* ───────────────────────── Scratchpad + enhance (Granola-style) ───────────────────────── */
+function scratchpadCard(hint){
+  return `<div class="pad-card">
+    <div class="pad-head">
+      <span class="pad-head-label">${icon('edit')} My notes</span>
+      <span class="pad-hint">${esc(hint||'')}</span>
+    </div>
+    <textarea id="scratchpad" spellcheck="false" oninput="scratchSave(this)"
+      placeholder="Jot rough notes — a few words per line is plenty.&#10;pricing concerns&#10;next steps for Q3&#10;AI expands each line with details from the transcript.">${esc(curScratchpad)}</textarea>
+  </div>`;
+}
+function scratchSave(el){
+  curScratchpad=el.value;
+  localStorage.setItem('ms_scratchpad', el.value);
+  growPad(el);
+}
+/* The scratchpad grows with its content, like the live transcript does. */
+function growPad(el){
+  el=el||document.getElementById('scratchpad');
+  if(!el) return;
+  // Give the full-width recording/processing scratchpad lots of room; keep the
+  // note-view "My notes" pad compact.
+  const isResult = !!el.closest('.result-pad');
+  const mobile = window.innerWidth<680;
+  const min = isResult ? (mobile?100:150) : (mobile?180:260);
+  el.style.height='auto';
+  el.style.height=Math.max(min, el.scrollHeight+2)+'px';
+}
+
+/* Stream /enhance and render: user's own words black, AI expansions gray. */
+async function runEnhance(){
+  const padText=(document.getElementById('scratchpad')?.value ?? curScratchpad).trim();
+  if(!padText){ showToast('Type a few notes first — then AI can expand them.','error'); return; }
+  if(!curTranscript){ showToast('No transcript yet.','error'); return; }
+  curScratchpad=padText;
+  const box=document.getElementById('enhanced-box'); if(!box) return;
+  box.innerHTML=`<div class="ai-empty" style="display:flex;align-items:center;gap:7px;margin:14px 0">${icon('sparkles')} Enhancing your notes…</div>`;
+  try{
+    const r=await fetch('/enhance',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({transcript:curTranscript, notes:padText})});
+    if(!r.ok){ box.innerHTML='<div class="ai-empty">Could not enhance the notes.</div>'; return; }
+    const reader=r.body.getReader(), decoder=new TextDecoder();
+    let md='';
+    box.innerHTML='<div class="enh-wrap"><div class="raw-stream" id="enh-stream"></div></div>';
+    const raw=document.getElementById('enh-stream');
+    while(true){
+      const {value,done}=await reader.read();
+      if(done) break;
+      md+=decoder.decode(value);
+      if(raw) raw.innerHTML=mdInline(md);
+    }
+    if(!md.trim()){
+      box.innerHTML=`<div class="ai-empty" style="margin:14px 0">Enhancing produced nothing — <a href="#" onclick="runEnhance();return false">try again</a>.</div>`;
+      return;
+    }
+    curEnhanced=md;
+    renderEnhanced(md);
+    if(curNoteId){
+      try{
+        await fetch(`/notes/${curNoteId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({enhanced:md, scratchpad:padText})});
+        const n=notes.find(x=>x.id===curNoteId); if(n){ n.enhanced=md; n.scratchpad=padText; }
+      }catch(e){}
+    }
+  }catch(e){ box.innerHTML='<div class="ai-empty">Could not enhance the notes.</div>'; }
+}
+
+function renderEnhanced(md){
+  const box=document.getElementById('enhanced-box'); if(!box) return;
+  if(!md){ box.innerHTML=''; return; }
+  let html=`<div class="enh-wrap"><div class="ai-label">${icon('sparkles')} Your notes, enhanced</div>`;
+  for(const line of md.split('\n')){
+    const t=line.trim();
+    if(!t) continue;
+    if(t.startsWith('###')) html+=`<div class="enh-head">${esc(t.replace(/^#+\s*/,''))}</div>`;
+    else html+=`<div class="enh-bullet">${esc(t.replace(/^[-*]\s*/,''))}</div>`;
+  }
+  box.innerHTML=html+'</div>';
+}
+
+/* ───────────────────────── AI notes (stream + structured render) ───────────────────────── */
+async function streamSummary(transcript, opts={}){
+  const box = document.getElementById('summary-box');
+  if (!box) return;
+  box.innerHTML = '<div class="ai-empty" style="display:flex;align-items:center;gap:7px;margin-top:16px">' + icon('sparkles') + ' Writing your notes…</div>';
+
+  const r = await fetch('/summarize', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ transcript, template: curTemplate })
+  });
+  if(!r.ok){ box.innerHTML = '<div class="ai-empty">Could not generate notes.</div>'; setStatus('AI notes failed','error'); return; }
+
+  const reader = r.body.getReader(), decoder = new TextDecoder();
+  let content = '';
+  box.innerHTML = '<div class="raw-stream" id="raw-stream"></div>';
+  const raw = document.getElementById('raw-stream');
+
+  while(true){
+    const {value, done} = await reader.read();
+    if(done) break;
+    content += decoder.decode(value);
+    if(raw) raw.innerHTML = mdInline(content);
+  }
+  curSummary = content;
+  const sections = parseSummarySections(curSummary);
+  renderStructuredSummary('summary-box', sections, { noteId: opts.noteId || null, actionStatus: opts.noteId ? (opts.actionStatus||{}) : curActionStatus });
+
+  // persist regenerated notes on saved meetings
+  if(opts.noteId){
+    try{
+      await fetch(`/notes/${opts.noteId}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({summary: content})});
+      const n = notes.find(x=>x.id===opts.noteId); if(n) n.summary = content;
+    }catch(e){}
+  }
+}
+
+function regenerateNotes(){
+  if(!curTranscript){ showToast('No transcript yet.','error'); return; }
+  setStatus('Regenerating notes…','working');
+  streamSummary(curTranscript, curNoteId?{noteId:curNoteId, actionStatus:curActionStatus}:{}).then(()=>setStatus('Notes ready.','ok'));
+}
+
+function mdInline(md){
+  return esc(md)
+    .replace(/^## (.+)$/gm,'<strong>$1</strong>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\n/g,'<br>');
+}
+
+function parseSummarySections(md){
+  const sections = {summary:'', decisions:[], actions:[], topics:[]};
+  if(!md) return sections;
+  const parts = md.split(/\n(?=##\s)/);
+  for(const part of parts){
+    const m = part.match(/^##\s*(.+?)\n([\s\S]*)$/);
+    if(!m){ continue; }
+    const header = m[1].trim().toLowerCase();
+    const body = m[2].trim();
+    if(header.includes('executive') || header === 'summary'){
+      sections.summary = body.replace(/^[-*]\s*/gm,'').trim();
+    } else if(header.includes('decision')){
+      sections.decisions = body.split('\n').map(l=>l.replace(/^[-*]\s*/,'').trim()).filter(Boolean);
+    } else if(header.includes('action')){
+      sections.actions = body.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+        const mm = l.match(/^[-*]\s*\[.?\]\s*(.+?)(?:\s*[—-]+\s*@?([\w.][\w .'-]*))?$/);
+        if(mm) return {text: mm[1].trim(), owner: (mm[2]||'').trim() || 'Unassigned'};
+        return {text: l.replace(/^[-*]\s*(\[.?\]\s*)?/,'').trim(), owner:'Unassigned'};
+      }).filter(a=>a.text);
+    } else if(header.includes('topic')){
+      sections.topics = body.split('\n').map(l=>l.replace(/^[-*]\s*/,'').trim()).filter(Boolean);
+    }
+  }
+  if(!sections.summary && !sections.decisions.length && !sections.actions.length){
+    sections.summary = md.replace(/^##.*$/gm,'').trim();
+  }
+  return sections;
+}
+
+function renderStructuredSummary(rootId, sections, opts={}){
+  const root = document.getElementById(rootId);
+  if(!root) return;
+  const noteId = opts.noteId || null;
+  const status = opts.actionStatus || {};
+  // Everything is editable in place; edits rebuild the markdown and save.
+  const ed = `contenteditable="plaintext-only" spellcheck="false" onblur="saveSummaryEdits('${rootId}',${noteId?`'${noteId}'`:'null'})"`;
+
+  let html = `<p class="lede editable" ${ed}>${esc(sections.summary || 'No summary available.')}</p>`;
+
+  html += `<div class="ai-section">
+    <div class="ai-label">${icon('checkcircle')} Key decisions</div>
+    ${sections.decisions.length ? `<ul class="decision-list">${sections.decisions.map(d=>`<li>${icon('check')}<span class="dec-text editable" ${ed}>${esc(d)}</span></li>`).join('')}</ul>` : `<div class="ai-empty">No decisions recorded.</div>`}
+  </div>`;
+
+  html += `<div class="ai-section">
+    <div class="ai-label">${icon('users')} Action items <span class="count-pill">${sections.actions.length}</span></div>
+    ${sections.actions.length ? `<div class="action-list">${sections.actions.map((a,i)=>`
+      <div class="action-item ${status[i]?'done':''}">
+        <input type="checkbox" ${status[i]?'checked':''} title="Mark done" onchange="toggleAction(this, ${i}, ${noteId?`'${noteId}'`:'null'})">
+        <span class="action-text editable" ${ed}>${esc(a.text)}</span>
+        <span class="action-owner editable" ${ed} title="Click to change assignee">@${esc(a.owner)}</span>
+      </div>`).join('')}</div>` : `<div class="ai-empty">No action items.</div>`}
+  </div>`;
+
+  if(sections.topics.length){
+    html += `<div class="ai-section">
+      <div class="ai-label">${icon('doc')} Topics</div>
+      <div class="topic-pills">${sections.topics.map(t=>`<span class="topic-pill editable" ${ed}>${esc(t)}</span>`).join('')}</div>
+    </div>`;
+  }
+  root.innerHTML = html;
+}
+
+// Rebuild the summary markdown from the edited cards and persist it.
+function summaryMarkdownFromDOM(root, status){
+  const lede = root.querySelector('.lede')?.textContent.trim() || '';
+  const decisions = [...root.querySelectorAll('.dec-text')].map(e=>e.textContent.trim()).filter(Boolean);
+  const actions = [...root.querySelectorAll('.action-item')].map((el,i)=>{
+    const text=(el.querySelector('.action-text')?.textContent||'').trim();
+    const owner=((el.querySelector('.action-owner')?.textContent||'').trim().replace(/^@/,'')||'Unassigned');
+    if(!text) return null;
+    return `- [${status&&status[i]?'x':' '}] ${text} — @${owner}`;
+  }).filter(Boolean);
+  const topics = [...root.querySelectorAll('.topic-pill')].map(e=>e.textContent.trim()).filter(Boolean);
+  return `## Executive Summary\n${lede}\n\n`
+    + `## Key Decisions\n${decisions.length?decisions.map(d=>`- ${d}`).join('\n'):'- No decisions were recorded.'}\n\n`
+    + `## Action Items\n${actions.length?actions.join('\n'):'- [ ] No action items were recorded. — @Unassigned'}\n\n`
+    + `## Topics Discussed\n${topics.length?topics.map(t=>`- ${t}`).join('\n'):'- N/A'}`;
+}
+
+async function saveSummaryEdits(rootId, noteId){
+  const root=document.getElementById(rootId); if(!root) return;
+  const n = noteId ? notes.find(x=>x.id===noteId) : null;
+  const md = summaryMarkdownFromDOM(root, (n&&n.action_status)||curActionStatus);
+  if(md === curSummary) return;
+  curSummary = md;
+  if(noteId){ await patchNote(noteId,{summary:md}); showToast('Notes updated','success'); }
+}
+
+async function toggleAction(checkboxEl, idx, noteId){
+  const checked = checkboxEl.checked;
+  checkboxEl.closest('.action-item')?.classList.toggle('done', checked);
+  if(noteId){
+    const n = notes.find(x=>x.id===noteId);
+    if(n){
+      n.action_status = n.action_status || {};
+      n.action_status[idx] = checked;
+      try{ await fetch(`/notes/${noteId}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action_status:n.action_status})}); }
+      catch(e){ showToast('Could not save checklist state', 'error'); }
+    }
+  } else {
+    curActionStatus[idx] = checked;
+  }
+}
+
+/* ───────────────────────── Auto-title & title editing ───────────────────────── */
+async function autoTitle(){
+  const inp = document.getElementById('note-title');
+  if(!inp || !curTranscript) return;
+  const v = inp.value.trim();
+  if(v && v !== 'Untitled meeting') return;   // user already named it
+  inp.value = '';
+  try{
+    const d = await fetch('/generate/title', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({transcript: curTranscript.slice(0, 6000)})}).then(r=>r.json());
+    const cur = document.getElementById('note-title');
+    if(d.title && cur && !cur.value.trim()){
+      cur.value=d.title;
+      document.getElementById('view-title').textContent=d.title;
+      if(curNoteId) await patchTitle(curNoteId);   // persist onto the auto-saved note
+    }
+  }catch(e){}
+}
+
+async function patchTitle(noteId){
+  const title = document.getElementById('note-title')?.value.trim() || 'Untitled meeting';
+  try{
+    await fetch(`/notes/${noteId}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title})});
+    const n = notes.find(x=>x.id===noteId); if(n) n.title = title;
+    document.getElementById('view-title').textContent = title;
+    renderNotesList();
+  }catch(e){ showToast('Could not rename', 'error'); }
+}
+
+/* ───────────────────────── Follow-up email ───────────────────────── */
+async function openEmailModal(){
+  if(!curTranscript){ showToast('No meeting content yet.','error'); return; }
+  const modal=document.getElementById('email-modal'), body=document.getElementById('email-body');
+  modal.classList.add('open');
+  body.textContent='Drafting…';
+  try{
+    const r = await fetch('/generate/email', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({transcript: curTranscript, summary: curSummary})});
+    if(!r.ok){ body.textContent='Could not draft the email.'; return; }
+    const reader=r.body.getReader(), decoder=new TextDecoder();
+    let out='';
+    body.textContent='';
+    while(true){
+      const {value, done}=await reader.read();
+      if(done) break;
+      out+=decoder.decode(value);
+      body.textContent=out;
+    }
+  }catch(e){ body.textContent='Could not draft the email.'; }
+}
+function closeEmailModal(){ document.getElementById('email-modal').classList.remove('open'); }
+document.getElementById('email-modal').addEventListener('click', e=>{ if(e.target.id==='email-modal') closeEmailModal(); });
+
+/* ───────────────────────── Calendar-triggered recording ───────────────────────── */
+let calDismissed={}, calPromptEv=null;
+
+async function checkCalendar(){
+  try{
+    const d=await fetch('/calendar/upcoming').then(r=>r.json());
+    if(!d.configured){ removeCalPrompt(); return; }
+    const now=Date.now();
+    const ev=(d.events||[]).find(e=>{
+      const s=new Date(e.start).getTime(), en=new Date(e.end).getTime();
+      return s<=now+2*60000 && en>now && !calDismissed[e.title+e.start];
+    });
+    if(!ev || isRecording){ removeCalPrompt(); return; }
+    showCalPrompt(ev);
+  }catch(e){}
+}
+
+function showCalPrompt(ev){
+  calPromptEv=ev;
+  let bar=document.getElementById('cal-prompt');
+  if(!bar){
+    bar=document.createElement('div');
+    bar.id='cal-prompt';
+    document.body.appendChild(bar);
+  }
+  const diffMin=Math.round((Date.now()-new Date(ev.start).getTime())/60000);
+  const when = diffMin < -1 ? `starts in ${-diffMin} min` : diffMin <= 1 ? 'is starting now' : `started ${diffMin} min ago`;
+  bar.innerHTML=`${icon('mic')}<span class="cal-text"><b>${esc(ev.title)}</b> ${when} — record it?</span>
+    <button class="btn btn-accent btn-sm" onclick="calRecord()">${icon('mic')} Record</button>
+    <button class="btn btn-ghost btn-sm" onclick="calDismissCurrent()">Dismiss</button>`;
+}
+
+function removeCalPrompt(){ document.getElementById('cal-prompt')?.remove(); }
+
+function calDismissCurrent(){
+  if(calPromptEv) calDismissed[calPromptEv.title+calPromptEv.start]=true;
+  removeCalPrompt();
+}
+
+async function calRecord(){
+  const ev=calPromptEv;
+  calDismissCurrent();
+  showRecorder();
+  pendingMeetingTitle = ev ? ev.title : '';   // becomes the note's title
+  await startRecording();
+}
+
+/* ───────────────────────── Settings ───────────────────────── */
+async function openSettings(){
+  try{
+    const s = await fetch('/settings').then(r=>r.json());
+    document.getElementById('set-model').value    = s.whisper_model;
+    document.getElementById('set-lang').value     = s.whisper_language || '';
+    document.getElementById('set-diarize').checked= !!s.diarize;
+    document.getElementById('set-speakers').value = String(s.num_speakers);
+    document.getElementById('set-calendar').value = s.calendar_ics_url || '';
+    document.getElementById('settings-note').textContent='';
+  }catch(e){ showToast('Could not load settings','error'); return; }
+  document.getElementById('settings-modal').classList.add('open');
+  checkLangModelHint();
+}
+function closeSettings(){ document.getElementById('settings-modal').classList.remove('open'); }
+document.getElementById('settings-modal').addEventListener('click', e=>{ if(e.target.id==='settings-modal') closeSettings(); });
+
+// Whisper's accuracy is heavily weighted toward English — non-English languages,
+// especially non-Latin-script ones, need a bigger model to be usable. Warn (and
+// offer a one-click fix) instead of letting people silently get bad transcripts.
+const LANG_NAMES = {hi:'Hindi', ur:'Urdu', ar:'Arabic', zh:'Chinese', ja:'Japanese',
+  ko:'Korean', ru:'Russian', tr:'Turkish', es:'Spanish', fr:'French', de:'German',
+  pt:'Portuguese', it:'Italian', nl:'Dutch'};
+// Languages where "small" is well known to struggle noticeably — non-Latin scripts
+// and other lower-resource languages benefit most from a bigger model.
+const LANG_NEEDS_BIGGER_MODEL = new Set(['hi','ur','ar','zh','ja','ko']);
+
+function checkLangModelHint(){
+  const lang = document.getElementById('set-lang')?.value;
+  const model = document.getElementById('set-model')?.value;
+  const hint = document.getElementById('lang-model-hint');
+  if(!hint) return;
+  if(!lang || lang==='en' || (model!=='tiny' && model!=='base' && model!=='small')){
+    hint.style.display='none'; return;
+  }
+  const name = LANG_NAMES[lang] || 'this language';
+  const strong = LANG_NEEDS_BIGGER_MODEL.has(lang);
+  hint.style.display='block';
+  hint.innerHTML = strong
+    ? `⚠️ Whisper's "${model}" model is tuned mainly for English and transcribes ${name} noticeably worse. `
+      + `For usable accuracy, switch <b>Transcription accuracy</b> to Medium or Large-v3.`
+    : `Note: non-English languages like ${name} are generally more accurate on Medium or Large-v3 than on "${model}".`;
+}
+
+async function saveSettings(){
+  const body = {
+    whisper_model:    document.getElementById('set-model').value,
+    whisper_language: document.getElementById('set-lang').value,
+    diarize:          document.getElementById('set-diarize').checked,
+    num_speakers:     parseInt(document.getElementById('set-speakers').value),
+    calendar_ics_url: document.getElementById('set-calendar').value.trim(),
+  };
+  try{
+    const r = await fetch('/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(e.detail||'Could not save settings'); }
+    const d = await r.json();
+    document.getElementById('settings-note').textContent =
+      d.restart_required ? 'Saved. Restart ItsMyPA to apply the changes.'
+                         : 'Saved — applied immediately.';
+    showToast('Settings saved','success');
+    checkCalendar();
+  }catch(e){ showToast(e.message,'error'); }
+}
+
+async function doImport(ev){
+  const f = ev.target.files[0];
+  ev.target.value='';
+  if(!f) return;
+  const fd = new FormData(); fd.append('backup', f, f.name);
+  try{
+    const r = await fetch('/import',{method:'POST',body:fd});
+    if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(e.detail||'Import failed'); }
+    const d = await r.json();
+    showToast(`Imported ${d.imported} meeting${d.imported===1?'':'s'}${d.skipped?` (${d.skipped} skipped)`:''}`,'success');
+    await loadNotes();
+  }catch(e){ showToast(e.message,'error'); }
+}
+
+/* ───────────────────────── Onboarding ───────────────────────── */
+async function maybeOnboard(){
+  if(localStorage.getItem('ms_onboarded')){
+    // A fresh install of an unsigned build is a "new app" to macOS: the mic /
+    // screen-recording grants are gone while localStorage survives. Re-open the
+    // permissions pane at launch instead of surprising the user mid-recording.
+    // Desktop-only: browsers manage their own mic permission UI.
+    if(!IS_DESKTOP) return;
+    const micOk=await micGranted();
+    const sysOk=await sysGranted();
+    // Don't nag about computer audio if the user chose to skip it before.
+    if(micOk && (sysOk!==false || localStorage.getItem('ms_sys_skipped'))) return;
+    goToPermissions();
+    document.getElementById('onboard-modal').classList.add('open');
+    return;
+  }
+  document.getElementById('ob-welcome').style.display='';
+  document.getElementById('ob-perms').style.display='none';
+  document.getElementById('onboard-modal').classList.add('open');
+}
+function goToPermissions(){
+  document.getElementById('ob-welcome').style.display='none';
+  document.getElementById('ob-perms').style.display='';
+  // Hide computer-audio row where native capture isn't available (browser/phone).
+  const sysRow=document.getElementById('perm-sys-toggle').closest('.perm-row');
+  sysRow.style.display = nativeCaptureAvailable ? '' : 'none';
+  // The pane can open before /health has answered (fresh install), so a stale
+  // flag would wrongly hide the computer-audio row — re-check directly.
+  if(!nativeCaptureAvailable){
+    fetch('/health').then(r=>r.json()).then(d=>{
+      nativeCaptureAvailable=!!d.system_audio;
+      sysRow.style.display = nativeCaptureAvailable ? '' : 'none';
+    }).catch(()=>{});
+  }
+  refreshMicStatus();
+  // Already granted (e.g. after the System Settings round-trip + relaunch)?
+  // Show "Enabled ✓" straight away — no second Enable click.
+  sysGranted().then(ok=>{ if(ok){ markPermGranted('sys'); localStorage.removeItem('ms_sys_skipped'); } });
+}
+function dismissOnboard(){
+  localStorage.setItem('ms_onboarded','1');
+  // Leaving with computer audio not enabled = a deliberate skip; don't re-nag
+  // at every launch (granting later, in Settings or here, clears this).
+  const sysOn=document.getElementById('perm-sys-toggle').classList.contains('on');
+  const sysRowShown=document.getElementById('perm-sys-toggle').closest('.perm-row').style.display!=='none';
+  if(sysRowShown && !sysOn) localStorage.setItem('ms_sys_skipped','1');
+  stopSysPermWatch();
+  document.getElementById('onboard-modal').classList.remove('open');
+}
+
+function markPermGranted(which){
+  document.getElementById(`perm-${which}-toggle`)?.classList.add('on');
+}
+
+// A permission toggle: off → run the grant flow; on → macOS can only revoke it
+// from System Settings, so say so rather than faking an off state.
+function togglePerm(which){
+  const t=document.getElementById(`perm-${which}-toggle`);
+  if(t?.classList.contains('on')){
+    const note=document.getElementById('perm-note');
+    note.style.color='var(--muted)';
+    note.textContent='Already on. To turn it off, use System Settings → Privacy & Security.';
+    return;
+  }
+  which==='mic' ? grantMic() : grantSystemAudio();
+}
+
+async function refreshMicStatus(){
+  if(IS_DESKTOP){
+    try{
+      const d=await fetch('/mic/status').then(r=>r.json());
+      if(d.available && d.state==='granted') markPermGranted('mic');
+      return;
+    }catch(e){}
+  }
+  try{
+    const s=await navigator.permissions?.query({name:'microphone'});
+    if(s && s.state==='granted') markPermGranted('mic');
+  }catch(e){}
+}
+
+// If recording setup dies after the mic opened, release it — a leaked live mic
+// keeps macOS voice processing (and its system-audio mute) engaged.
+function releaseStream(s){ try{ s?.getTracks().forEach(t=>t.stop()); }catch(e){} }
+
+async function grantMic(){
+  const note=document.getElementById('perm-note');
+  if(IS_DESKTOP){
+    // The native helper triggers the macOS mic prompt (attributed to the app),
+    // then we immediately stop the probe capture — we only wanted the grant.
+    note.style.color='var(--muted)'; note.textContent='Requesting…';
+    try{
+      const r=await fetch('/mic/start',{method:'POST'});
+      if(r.ok){
+        const d=await r.json();
+        fetch('/mic/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({capture_id:d.capture_id})});
+        markPermGranted('mic');
+        note.textContent='';
+      } else {
+        const e=await r.json().catch(()=>({}));
+        note.style.color='var(--amber)';
+        note.textContent=e.detail||'Microphone was blocked. Enable it in System Settings → Privacy & Security → Microphone, then reopen ItsMyPA.';
+      }
+    }catch(e){ note.style.color='var(--amber)'; note.textContent='Could not reach the recorder engine.'; }
+    return;
+  }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:MIC_RAW});
+    stream.getTracks().forEach(t=>t.stop());
+    markPermGranted('mic');
+    note.textContent='';
+  }catch(e){
+    note.textContent='Microphone was blocked. Enable it in System Settings → Privacy & Security → Microphone, then reopen ItsMyPA.';
+  }
+}
+
+async function grantSystemAudio(){
+  const note=document.getElementById('perm-note');
+  note.style.color='var(--muted)'; note.textContent='Requesting…';
+  try{
+    const r=await fetch('/system_audio/start',{method:'POST'});
+    if(r.ok){
+      const d=await r.json();
+      // Immediately stop the probe capture — we only wanted the permission.
+      fetch('/system_audio/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({capture_id:d.capture_id})});
+      stopSysPermWatch();
+      markPermGranted('sys');
+      localStorage.removeItem('ms_sys_skipped');
+      note.style.color='var(--muted)'; note.textContent='';
+    } else if(r.status===403){
+      note.style.color='var(--amber)';
+      note.textContent='macOS needs Screen Recording permission. Open System Settings → Privacy & Security → Screen Recording, enable ItsMyPA — I\'ll detect it when you come back.';
+      startSysPermWatch();
+    } else {
+      const e=await r.json().catch(()=>({}));
+      note.style.color='var(--amber)';
+      note.textContent=e.detail || 'Could not enable computer audio.';
+    }
+  }catch(e){ note.style.color='var(--amber)'; note.textContent='Could not enable computer audio.'; }
+}
+
+/* While the user is off in System Settings granting Screen Recording, re-probe
+   when they return to the app so the grant completes during onboarding — not as
+   a surprise on the first record press. */
+let sysPermWatching=false, sysPermRetries=0;
+function startSysPermWatch(){
+  if(sysPermWatching) return;
+  sysPermWatching=true; sysPermRetries=0;
+  window.addEventListener('focus', sysPermReprobe);
+}
+function stopSysPermWatch(){
+  sysPermWatching=false;
+  window.removeEventListener('focus', sysPermReprobe);
+}
+async function sysPermReprobe(){
+  if(!document.getElementById('onboard-modal').classList.contains('open')){ stopSysPermWatch(); return; }
+  if(sysPermRetries>=5){ stopSysPermWatch(); return; }   // don't churn probes forever
+  try{
+    // Silent preflight first — only run a real capture probe once macOS says
+    // the toggle is on, so returning from System Settings never re-prompts.
+    if(await sysGranted()!==true){ return; }
+    const r=await fetch('/system_audio/start',{method:'POST'});
+    if(r.ok){
+      const d=await r.json();
+      fetch('/system_audio/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({capture_id:d.capture_id})});
+      stopSysPermWatch();
+      markPermGranted('sys');
+      localStorage.removeItem('ms_sys_skipped');
+      const note=document.getElementById('perm-note');
+      note.style.color='var(--muted)'; note.textContent='';
+    } else if(r.status===403 && ++sysPermRetries>=1){
+      // Toggle is on but capture still blocked: macOS applies Screen
+      // Recording changes only after the app restarts.
+      const note=document.getElementById('perm-note');
+      note.style.color='var(--amber)';
+      note.textContent='Almost there — quit ItsMyPA fully (Cmd+Q) and reopen it. macOS applies Screen Recording permission on the next launch.';
+    }
+  }catch(e){}
+}
+
+const SAMPLE_NOTE = {
+  title: "Sample — Mobile App Launch Planning",
+  duration: 34,
+  transcript: "[Speaker 1 00:00] Good morning everyone, thanks for joining. Today we need to decide on the launch date for the mobile app. I propose we target the 15th of August, which gives the QA team three full weeks.\n\n[Speaker 2 00:11] That works for me. I will own the release checklist and coordinate with marketing. One concern though, the Android build still fails on older devices, so someone needs to fix that before we commit.\n\n[Speaker 1 00:24] Let us make fixing the Android build a blocking action item. I will take it. So we are decided. Launch on August 15th. Pending the fix.",
+  summary: "## Executive Summary\nThe team met to set a launch date for the mobile app. They agreed to target August 15th, giving QA three full weeks, contingent on fixing a blocking Android build failure on older devices.\n\n## Key Decisions\n- Launch the mobile app on August 15th, pending the Android build fix.\n- Fixing the Android build is a blocking action item.\n\n## Action Items\n- [ ] Fix the Android build failure on older devices — @Speaker 1\n- [ ] Own the release checklist and coordinate with marketing — @Speaker 2\n\n## Topics Discussed\n- Launch date\n- QA timeline\n- Android build failure\n- Release checklist",
+  segments: [
+    {speaker:"Speaker 1", text:"Good morning everyone, thanks for joining. Today we need to decide on the launch date for the mobile app. I propose we target the 15th of August, which gives the QA team three full weeks.", start:0.13, end:10.7},
+    {speaker:"Speaker 2", text:"That works for me. I will own the release checklist and coordinate with marketing. One concern though, the Android build still fails on older devices, so someone needs to fix that before we commit.", start:11.53, end:23.37},
+    {speaker:"Speaker 1", text:"Let us make fixing the Android build a blocking action item. I will take it. So we are decided. Launch on August 15th. Pending the fix.", start:24.26, end:33.41}
+  ],
+  action_status: {}
+};
+
+async function trySample(){
+  dismissOnboard();
+  try{
+    const r = await fetch('/notes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(SAMPLE_NOTE)});
+    const d = await r.json();
+    await loadNotes();
+    viewNote(d.id);
+    showToast('This is a sample meeting — poke around, then delete it','success');
+  }catch(e){ showToast('Could not create the sample meeting','error'); }
+}
+
+/* ───────── Per-note chat (Ask AI tab within a meeting) ───────── */
+let chatHistory = [];
+let chatBusy = false;
+
+// The fab now opens the global "Ask your meetings" panel; per-note chat lives
+// in the note's Ask AI tab. Kept as no-ops so existing call sites stay simple.
+function updateChatFab(){}
+function closeChat(){}
+
+function resetChat(){
+  chatHistory = [];
+  const log = document.getElementById('chat-log');
+  if (log) log.innerHTML = '<div class="chat-empty">Ask anything about this meeting — answers come only from the transcript.</div>';
+}
+
+function appendChat(role, text){
+  const log = document.getElementById('chat-log');
+  if (!log) return null;
+  const empty = log.querySelector('.chat-empty');
+  if (empty) empty.remove();
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+async function sendChat(){
+  const input = document.getElementById('chat-input');
+  if (!input) return;
+  const question = input.value.trim();
+  if (!question || chatBusy) return;
+  if (!curTranscript) { showToast('No transcript to ask about yet.', 'error'); return; }
+
+  chatBusy = true;
+  input.value = '';
+  appendChat('user', question);
+  const botDiv = appendChat('bot', '…');
+
+  try {
+    const r = await fetch('/chat', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ transcript: curTranscript, question, history: chatHistory })
+    });
+    if (!r.ok) { botDiv.textContent = 'Error getting an answer.'; chatBusy = false; return; }
+
+    const reader = r.body.getReader(), decoder = new TextDecoder();
+    let answer = '';
+    botDiv.textContent = '';
+    while (true) {
+      const {value, done} = await reader.read();
+      if (done) break;
+      answer += decoder.decode(value);
+      botDiv.textContent = answer;
+      document.getElementById('chat-log').scrollTop = 1e9;
+    }
+    chatHistory.push({ role: 'user', content: question });
+    chatHistory.push({ role: 'assistant', content: answer });
+  } catch(e) {
+    botDiv.textContent = 'Error getting an answer.';
+  }
+  chatBusy = false;
+}
+
+function setStatus(msg,cls=''){ const el=document.getElementById('status'); if(el){el.textContent=msg;el.className=`status-msg ${cls}`;} }
+
+/* ───────────────────────── Notes list / sidebar ───────────────────────── */
+async function loadNotes(){ notes=await fetch('/notes').then(r=>r.json()); renderNotesList(); }
+
+function groupNotesByDate(list){
+  const now = new Date();
+  const startOfDay = d => new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  const today = startOfDay(now);
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate()-1);
+  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate()-7);
+  const groups = {Today:[], Yesterday:[], 'This week':[], Earlier:[]};
+  for(const n of list){
+    const d = startOfDay(new Date(n.date));
+    if(d.getTime()===today.getTime()) groups.Today.push(n);
+    else if(d.getTime()===yesterday.getTime()) groups.Yesterday.push(n);
+    else if(d > weekAgo) groups['This week'].push(n);
+    else groups.Earlier.push(n);
+  }
+  return groups;
+}
+
+function renderNotesList(){
+  const el=document.getElementById('notes-list');
+  const qRaw = (document.getElementById('note-search')?.value||'').trim();
+  const q = qRaw.toLowerCase();
+  // Search the summary and the user's own notes too — decisions are usually
+  // paraphrased into the summary, so their wording never appears in the
+  // transcript (searching "$45,000" used to return nothing).
+  const filtered = q ? notes.filter(n =>
+    [n.title, n.transcript, n.summary, n.scratchpad, n.enhanced]
+      .some(f => (f||'').toLowerCase().includes(q))) : notes;
+
+  if(!filtered.length){
+    el.innerHTML = `<div class="empty-notes">${icon('inbox')}<br>${q ? 'No meetings match your search.' : 'No meetings yet.<br>Record your first one!'}</div>`;
+    return;
+  }
+  // Staggered entrance only on the first paint — re-renders while typing in
+  // the search box must not flicker.
+  if(!renderNotesList._animated){
+    renderNotesList._animated=true;
+    el.classList.add('stagger');
+    setTimeout(()=>el.classList.remove('stagger'),900);
+  }
+  const groups = groupNotesByDate(filtered);
+  let html = '';
+  for(const [label, items] of Object.entries(groups)){
+    if(!items.length) continue;
+    html += `<div class="notes-group-label">${label}</div>`;
+    html += items.map(n=>{
+      const processing = n.status && n.status!=='ready';
+      const meta = processing
+        ? `<span class="note-status"><span class="note-status-dot"></span>Processing…</span>`
+        : `${fmtDur(n.duration)}${n.segments?` · ${[...new Set(n.segments.map(s=>s.speaker))].length} speakers`:''}`;
+      return `<div class="note-item ${n.id===curNoteId?'active':''}" tabindex="0" onclick="viewNote('${n.id}')" onkeydown="if(event.key==='Enter')viewNote('${n.id}')" id="ni-${n.id}">
+      <div class="note-title">${esc(n.title)||'Untitled meeting'}</div>
+      <div class="note-meta">${meta}</div>
+    </div>`;}).join('');
+  }
+  el.innerHTML = html;
+}
+
+
+function viewNote(id){
+  const n=notes.find(x=>x.id===id); if(!n)return;
+  // If a recording is running, snapshot its notes before we overwrite shared
+  // state — the recording keeps going and the pill brings the user back to it.
+  if(isRecording) recScratchpadSnap = document.getElementById('scratchpad')?.value ?? curScratchpad;
+  curNoteId=id;
+  document.querySelectorAll('.note-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById(`ni-${id}`)?.classList.add('active');
+  curTranscript=n.transcript||''; curSummary=n.summary||''; curSegments=n.segments||null; curActionStatus=n.action_status||{};
+  curScratchpad=n.scratchpad||''; curEnhanced=n.enhanced||'';
+  elapsed = 0;
+
+  if(n.status && n.status!=='ready'){   // still transcribing/summarising
+    renderProcessingNote(n);
+    resetChat(); updateChatFab(); closeSidebar(); updateRecPill();
+    return;
+  }
+
+  buildResultView({saved:true, noteId:n.id, title:n.title, dateIso:n.date, duration:n.duration});
+  renderTranscript('transcript-box', n.transcript, n.segments);
+  renderEnhanced(curEnhanced);
+  const sections = parseSummarySections(n.summary || '');
+  renderStructuredSummary('summary-box', sections, {noteId: n.id, actionStatus: n.action_status||{}});
+  resetChat(); updateChatFab();
+  closeSidebar();
+  updateRecPill();   // surface the "return to recording" pill if one is running
+}
+
+function renderProcessingNote(n){
+  document.getElementById('view-title').textContent = n.title || 'Processing…';
+  document.getElementById('topbar-actions').innerHTML =
+    `<button class="btn btn-danger btn-sm" onclick="deleteNote('${n.id}')">${icon('trash')} Delete</button>`;
+  document.getElementById('content').innerHTML = `<div class="note-wrap"><div id="session-area"></div></div>`;
+  document.getElementById('session-area').innerHTML = processingSessionHTML();
+  growPad();
+  const sc=document.querySelector('.content'); if(sc) sc.scrollTop=0;
+}
+
+function exportNote(id){
+  const n = notes.find(x=>x.id===id); if(!n) return;
+  const sections = parseSummarySections(n.summary||'');
+  let md = `# ${n.title}\n\n_${fmtDate(n.date)} · ${fmtDur(n.duration)}_\n\n`;
+  md += `## Executive Summary\n${sections.summary||'—'}\n\n`;
+  md += `## Key Decisions\n${sections.decisions.length?sections.decisions.map(d=>`- ${d}`).join('\n'):'- None recorded'}\n\n`;
+  md += `## Action Items\n${sections.actions.length?sections.actions.map((a,i)=>`- [${(n.action_status&&n.action_status[i])?'x':' '}] ${a.text} — ${a.owner}`).join('\n'):'- None recorded'}\n\n`;
+  md += `## Topics\n${sections.topics.length?sections.topics.map(t=>`- ${t}`).join('\n'):'- None'}\n\n`;
+  if(n.enhanced) md += `## My Notes, Enhanced\n${n.enhanced}\n\n`;
+  md += `## Full Transcript\n${n.transcript||'—'}\n`;
+  const blob = new Blob([md], {type:'text/markdown'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${(n.title||'meeting').replace(/[^\w.-]+/g,'_')}.md`;
+  document.body.appendChild(a); a.click(); a.remove();
+  showToast('Exported as Markdown', 'success');
+}
+
+let confirmResolve=null;
+function appConfirm(message, okLabel='Delete'){
+  document.getElementById('confirm-text').textContent=message;
+  document.getElementById('confirm-ok').textContent=okLabel;
+  document.getElementById('confirm-modal').classList.add('open');
+  return new Promise(res=>{ confirmResolve=res; });
+}
+function resolveConfirm(v){
+  document.getElementById('confirm-modal').classList.remove('open');
+  confirmResolve?.(v); confirmResolve=null;
+}
+
+/* ── Ask AI across ALL meetings (global, right-side panel) ── */
+let askBusy=false;
+function askEmpty(){
+  return '<div class="ask-empty">Ask a question across every saved meeting.<br>'
+    + 'e.g. “what did I agree with John on July 8?” or “status of the frontend?”</div>';
+}
+// The panel overlays the right side; on a narrow window the sidebar + panel
+// would leave the meeting itself unreadable, so tuck the sidebar away while
+// the panel is open and restore it on close (only if we were the one to hide it).
+const ASK_ROOMY_WIDTH = 1200;
+let askAutoCollapsedSidebar = false;
+
+function toggleAskPanel(){
+  const p=document.getElementById('ask-panel');
+  const opening=!p.classList.contains('open');
+  p.classList.toggle('open', opening);
+  document.body.classList.toggle('ask-open', opening);
+  const sb=document.getElementById('sidebar');
+  if(opening){
+    if(window.innerWidth<ASK_ROOMY_WIDTH && window.innerWidth>680 && !sb.classList.contains('collapsed')){
+      sb.classList.add('collapsed');
+      askAutoCollapsedSidebar=true;
+    }
+    const log=document.getElementById('ask-log');
+    if(log && !log.children.length) log.innerHTML=askEmpty();
+    document.getElementById('ask-input').focus();
+  } else {
+    restoreSidebarAfterAsk();
+  }
+}
+function closeAskPanel(){
+  document.getElementById('ask-panel').classList.remove('open');
+  document.body.classList.remove('ask-open');
+  restoreSidebarAfterAsk();
+}
+function restoreSidebarAfterAsk(){
+  if(!askAutoCollapsedSidebar) return;   // user's own collapse choice — leave it
+  document.getElementById('sidebar').classList.remove('collapsed');
+  askAutoCollapsedSidebar=false;
+}
+// Escape closes the ask panel (and the mobile sidebar drawer).
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Escape') return;
+  if(document.getElementById('ask-panel')?.classList.contains('open')) closeAskPanel();
+  else document.getElementById('sidebar')?.classList.remove('open');
+});
+
+async function sendAsk(){
+  const input=document.getElementById('ask-input');
+  const q=(input.value||'').trim();
+  if(!q || askBusy) return;
+  askBusy=true; input.value='';
+  const log=document.getElementById('ask-log');
+  log.querySelector('.ask-empty')?.remove();
+
+  const qEl=document.createElement('div'); qEl.className='ask-q-label'; qEl.textContent=q; log.appendChild(qEl);
+  const ansEl=document.createElement('div'); ansEl.className='ask-answer'; ansEl.textContent='Searching your meetings…'; log.appendChild(ansEl);
+  const srcEl=document.createElement('div'); srcEl.className='ask-src-row'; log.appendChild(srcEl);
+  log.scrollTop=log.scrollHeight;
+
+  try{
+    const r=await fetch('/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});
+    if(!r.ok) throw new Error();
+    const reader=r.body.getReader(), dec=new TextDecoder(); let out='';
+    while(true){
+      const {value,done}=await reader.read(); if(done) break;
+      out+=dec.decode(value);
+      const cut=out.indexOf('@@SOURCES@@');
+      ansEl.innerHTML=mdInline(cut>=0?out.slice(0,cut):out);
+      log.scrollTop=log.scrollHeight;
+    }
+    const cut=out.indexOf('@@SOURCES@@');
+    if(cut>=0){
+      let srcs=[]; try{ srcs=JSON.parse(out.slice(cut+11)); }catch(e){}
+      srcEl.innerHTML=srcs.map(s=>
+        `<button class="btn btn-ghost btn-sm" onclick="closeAskPanel();viewNote('${s.id}')">${esc(s.title)} · ${esc(s.date)}</button>`).join('');
+    }
+  }catch(e){
+    ansEl.textContent='Could not search your meetings — is the AI model loaded?';
+  }
+  askBusy=false; log.scrollTop=log.scrollHeight;
+}
+
+async function deleteNote(id){
+  if(!await appConfirm('Delete this meeting? This cannot be undone.','Delete'))return;
+  await fetch(`/notes/${id}`,{method:'DELETE'}); await loadNotes(); showRecorder(); showToast('Meeting deleted','success');
+}
+
+/* ───────────────────────── Utils ───────────────────────── */
+function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escAttr(s){return esc(s).replace(/"/g,'&quot;');}
+function fmtDate(iso){return new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function fmtDur(s){if(!s)return'—';const m=Math.floor(s/60),sec=s%60;return m?`${m}m ${sec}s`:`${sec}s`;}
+async function copyText(t){try{await navigator.clipboard.writeText(t);showToast('Copied to clipboard','success');}catch(e){showToast('Could not copy','error');}}
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  // Phones: off-canvas drawer (.open). Desktop: collapse to zero width (.collapsed).
+  if(window.innerWidth<=680) sb.classList.toggle('open');
+  else sb.classList.toggle('collapsed');
+  askAutoCollapsedSidebar=false;   // the user took over; don't override them later
+}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');}
+
+boot();
+</script>
+</body>
+</html>
