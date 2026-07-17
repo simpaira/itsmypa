@@ -3,10 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ItsMyPA — the AI meeting notetaker that never phones home</title>
+<title>ItsMyPA — private AI meeting notes for macOS</title>
 <meta name="description" content="AI meeting transcription, speaker separation and structured notes — 100% on your Mac. No cloud, no account, no subscription. Your audio never leaves your machine.">
 <meta property="og:title" content="ItsMyPA — your meetings are being uploaded. Stop that.">
 <meta property="og:description" content="AI meeting notes that run 100% on your Mac. No cloud, no account, no subscription.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎙️</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..800;1,6..72,400..800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -14,172 +15,376 @@
   :root {
     --ink: #1a1712;
     --paper: #faf6ef;
-    --paper-2: #f1eade;
+    --card: #ffffff;
     --accent: #c2410c;
-    --accent-dark: #9a3412;
+    --accent-soft: #fff1e8;
     --ok: #166534;
+    --ok-soft: #ecfdf3;
     --muted: #6b6459;
-    --line: #e5ddd0;
+    --line: #e8e0d2;
+    --shadow-lg: 0 24px 70px -18px rgba(26,23,18,.25);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body {
     font-family: 'Inter', -apple-system, sans-serif;
-    background: var(--paper);
-    color: var(--ink);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
+    background: var(--paper); color: var(--ink);
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
-  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
   a { color: var(--accent); }
+  .serif { font-family: 'Newsreader', serif; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* reveal-on-scroll */
+  .reveal { opacity: 0; transform: translateY(26px); transition: opacity .7s ease, transform .7s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .reveal { opacity:1; transform:none; transition:none } }
+
+  /* ── nav ── */
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    background: rgba(250,246,239,.82); border-bottom: 1px solid var(--line);
+  }
+  .nav-in { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .brand { font-weight: 700; font-size: 18px; text-decoration: none; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+  .nav-links { display: flex; gap: 26px; align-items: center; }
+  .nav-links a { color: var(--muted); text-decoration: none; font-size: 14.5px; font-weight: 500; }
+  .nav-links a:hover { color: var(--ink); }
+  .nav-cta {
+    background: var(--ink); color: var(--paper) !important; padding: 9px 18px;
+    border-radius: 9px; font-weight: 600 !important;
+  }
+  @media (max-width: 720px) { .nav-links a:not(.nav-cta) { display: none; } }
 
   /* ── hero ── */
-  .hero { padding: 96px 0 72px; text-align: center; }
-  .hero .kicker {
-    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600;
-    letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
+  .hero { padding: 84px 0 40px; text-align: center; position: relative; }
+  .hero::before, .hero::after {
+    content: ""; position: absolute; border-radius: 50%; filter: blur(90px); z-index: -1; opacity: .5;
   }
+  .hero::before { width: 480px; height: 480px; background: #fed7aa; top: -140px; left: -160px; }
+  .hero::after  { width: 420px; height: 420px; background: #d9f99d; top: 40px; right: -180px; opacity: .35; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--ok-soft); color: var(--ok); border: 1px solid #bbe5c8;
+    font-size: 13px; font-weight: 600; padding: 7px 16px; border-radius: 999px;
+  }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: pulse 1.8s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
   .hero h1 {
     font-family: 'Newsreader', serif; font-weight: 800;
-    font-size: clamp(40px, 7vw, 72px); line-height: 1.05;
-    margin: 18px auto 0; max-width: 17ch; letter-spacing: -0.02em;
+    font-size: clamp(42px, 6.5vw, 76px); line-height: 1.03; letter-spacing: -.02em;
+    margin: 22px auto 0; max-width: 16ch;
   }
   .hero h1 em { font-style: italic; color: var(--accent); }
-  .hero .sub {
-    font-size: clamp(17px, 2.2vw, 21px); color: var(--muted);
-    max-width: 56ch; margin: 24px auto 0;
-  }
+  .hero .sub { font-size: clamp(17px, 2.1vw, 20px); color: var(--muted); max-width: 52ch; margin: 22px auto 0; }
   .hero .sub strong { color: var(--ink); }
-  .cta-row { margin-top: 40px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .cta-row { margin-top: 34px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
   .btn {
-    display: inline-block; padding: 16px 32px; border-radius: 10px;
-    font-weight: 600; font-size: 17px; text-decoration: none; transition: transform .12s ease;
+    display: inline-flex; align-items: center; gap: 9px; padding: 15px 30px; border-radius: 11px;
+    font-weight: 600; font-size: 16.5px; text-decoration: none; transition: transform .13s ease, box-shadow .13s ease;
   }
   .btn:hover { transform: translateY(-2px); }
-  .btn-primary { background: var(--ink); color: var(--paper); }
-  .btn-ghost { border: 1.5px solid var(--line); color: var(--ink); background: #fff; }
-  .fineprint { margin-top: 14px; font-size: 13px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .btn-primary { background: var(--ink); color: var(--paper); box-shadow: 0 10px 26px -10px rgba(26,23,18,.5); }
+  .btn-ghost { border: 1.5px solid var(--line); color: var(--ink); background: var(--card); }
+  .fineprint { margin-top: 14px; font-size: 12.5px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
 
-  /* ── rage section ── */
-  .rage { background: var(--ink); color: var(--paper); padding: 88px 0; }
-  .rage h2 {
-    font-family: 'Newsreader', serif; font-weight: 800;
-    font-size: clamp(30px, 4.5vw, 46px); line-height: 1.15; max-width: 22ch;
+  /* ── app mockup ── */
+  .stage { padding: 46px 0 90px; perspective: 1400px; }
+  .window {
+    max-width: 940px; margin: 0 auto; background: var(--card);
+    border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-lg);
+    text-align: left; overflow: hidden;
+    transform: rotateX(4deg); transition: transform .6s ease;
   }
-  .rage p { margin-top: 20px; max-width: 62ch; font-size: 18px; color: #c9c2b6; }
+  .window:hover { transform: rotateX(0); }
+  .titlebar { display: flex; align-items: center; gap: 8px; padding: 13px 16px; border-bottom: 1px solid var(--line); background: #fdfbf7; }
+  .dot3 { width: 12px; height: 12px; border-radius: 50%; }
+  .titlebar .t { flex: 1; text-align: center; font-size: 13px; color: var(--muted); font-weight: 500; }
+  .app-body { display: grid; grid-template-columns: 218px 1fr; min-height: 430px; }
+  @media (max-width: 760px) { .app-body { grid-template-columns: 1fr; } .sidebar { display: none; } }
+  .sidebar { border-right: 1px solid var(--line); background: #fdfbf7; padding: 16px 12px; font-size: 13px; }
+  .sidebar .sec { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 14px 8px 6px; font-family: 'JetBrains Mono', monospace; }
+  .sitem { padding: 8px 10px; border-radius: 8px; color: var(--ink); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sitem.active { background: var(--accent-soft); font-weight: 600; }
+  .sitem small { display: block; color: var(--muted); font-weight: 400; font-size: 11.5px; }
+  .note { padding: 26px 32px; }
+  .rec-pill {
+    display: inline-flex; align-items: center; gap: 10px; background: #fef2f2; border: 1px solid #fecaca;
+    color: #b91c1c; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; float: right;
+  }
+  .wave { display: flex; gap: 2.5px; align-items: center; height: 16px; }
+  .wave i { width: 3px; background: #ef4444; border-radius: 2px; animation: wv 1s ease-in-out infinite; }
+  .wave i:nth-child(1){height:6px; animation-delay:0s} .wave i:nth-child(2){height:12px; animation-delay:.15s}
+  .wave i:nth-child(3){height:16px; animation-delay:.3s} .wave i:nth-child(4){height:9px; animation-delay:.45s}
+  .wave i:nth-child(5){height:13px; animation-delay:.6s}
+  @keyframes wv { 0%,100%{transform:scaleY(.5)} 50%{transform:scaleY(1)} }
+  .note h4 { font-family: 'Newsreader', serif; font-size: 26px; font-weight: 700; }
+  .note .meta { font-size: 12.5px; color: var(--muted); margin: 4px 0 18px; font-family: 'JetBrains Mono', monospace; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+  .tab { padding: 8px 14px; font-size: 13.5px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; }
+  .tab.on { color: var(--ink); border-color: var(--accent); }
+  .ncard { background: var(--paper); border: 1px solid var(--line); border-radius: 11px; padding: 14px 16px; margin-bottom: 12px; }
+  .ncard h5 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); font-family: 'JetBrains Mono', monospace; margin-bottom: 8px; }
+  .ncard p, .ncard li { font-size: 13.5px; color: #3d382f; }
+  .check { display: flex; gap: 9px; align-items: flex-start; margin-bottom: 7px; font-size: 13.5px; color: #3d382f; }
+  .box { width: 15px; height: 15px; border: 1.5px solid #cbc2b2; border-radius: 4px; margin-top: 2px; flex: none; }
+  .box.done { background: var(--ok); border-color: var(--ok); position: relative; }
+  .box.done::after { content: "✓"; color: #fff; font-size: 10px; position: absolute; top: -1.5px; left: 2.5px; }
+  .tag { background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 600; padding: 1.5px 8px; border-radius: 999px; }
+
+  /* ── logos strip ── */
+  .strip { padding: 26px 0 74px; text-align: center; }
+  .strip .cap { font-size: 12.5px; color: var(--muted); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 16px; }
+  .strip .apps { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .appchip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 9px 20px; font-weight: 600; font-size: 14px; color: #3d382f; }
+
+  /* ── rage ── */
+  .rage { background: var(--ink); color: var(--paper); padding: 96px 0; position: relative; overflow: hidden; }
+  .rage::before { content: "REC ●"; position: absolute; right: -30px; top: 30px; font-family: 'JetBrains Mono', monospace; font-size: 120px; font-weight: 700; color: rgba(239,68,68,.08); transform: rotate(8deg); }
+  .rage h2 { font-family: 'Newsreader', serif; font-weight: 800; font-size: clamp(30px, 4.6vw, 48px); line-height: 1.12; max-width: 21ch; }
+  .rage p { margin-top: 20px; max-width: 60ch; font-size: 18px; color: #c9c2b6; }
   .rage p strong { color: var(--paper); }
-  .rage .zinger {
-    margin-top: 28px; font-family: 'Newsreader', serif; font-style: italic;
-    font-size: clamp(21px, 3vw, 27px); color: #fdba74;
-  }
+  .rage .zinger { margin-top: 30px; font-family: 'Newsreader', serif; font-style: italic; font-size: clamp(22px, 3vw, 30px); color: #fdba74; }
 
-  /* ── comparison ── */
-  .compare { padding: 80px 0; }
-  h2.section {
-    font-family: 'Newsreader', serif; font-weight: 800; text-align: center;
-    font-size: clamp(28px, 4vw, 40px); margin-bottom: 40px;
+  /* ── sections ── */
+  h2.section { font-family: 'Newsreader', serif; font-weight: 800; text-align: center; font-size: clamp(30px, 4.2vw, 44px); letter-spacing: -.01em; }
+  p.section-sub { text-align: center; color: var(--muted); max-width: 54ch; margin: 14px auto 48px; font-size: 17px; }
+
+  /* ── features ── */
+  .features { padding: 96px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 28px;
+    transition: transform .18s ease, box-shadow .18s ease;
   }
-  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 20px rgba(26,23,18,.07); }
-  th, td { padding: 15px 20px; text-align: left; border-bottom: 1px solid var(--line); font-size: 15.5px; }
-  th { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; font-family: 'JetBrains Mono', monospace; }
-  th:first-child, td:first-child { color: var(--muted); width: 34%; }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 18px 40px -18px rgba(26,23,18,.18); }
+  .card .emoji { font-size: 28px; }
+  .card h3 { font-family: 'Newsreader', serif; font-size: 21px; margin: 12px 0 6px; }
+  .card p { font-size: 14.5px; color: var(--muted); }
+
+  /* ── how ── */
+  .how { padding: 20px 0 96px; }
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 22px; counter-reset: step; }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 28px; position: relative; }
+  .step::before {
+    counter-increment: step; content: counter(step);
+    font-family: 'Newsreader', serif; font-weight: 800; font-size: 42px; color: var(--accent);
+    display: block; line-height: 1; margin-bottom: 12px;
+  }
+  .step h3 { font-size: 17px; margin-bottom: 6px; }
+  .step p { font-size: 14.5px; color: var(--muted); }
+
+  /* ── compare ── */
+  .compare { padding: 0 0 96px; }
+  .table-scroll { overflow-x: auto; border-radius: 16px; box-shadow: 0 2px 24px rgba(26,23,18,.08); }
+  table { width: 100%; border-collapse: collapse; background: var(--card); min-width: 560px; }
+  th, td { padding: 16px 22px; text-align: left; border-bottom: 1px solid var(--line); font-size: 15px; }
+  th { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; font-family: 'JetBrains Mono', monospace; }
+  th:first-child, td:first-child { color: var(--muted); width: 32%; }
+  th:last-child { color: var(--accent); }
   td.bad { color: #b91c1c; }
   td.good { color: var(--ok); font-weight: 600; }
   tr:last-child td { border-bottom: none; }
-  .table-scroll { overflow-x: auto; }
-
-  /* ── features ── */
-  .features { padding: 80px 0; background: #fff; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 28px; }
-  .card { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 26px; }
-  .card .emoji { font-size: 26px; }
-  .card h3 { font-family: 'Newsreader', serif; font-size: 20px; margin: 10px 0 6px; }
-  .card p { font-size: 15px; color: var(--muted); }
 
   /* ── trust ── */
-  .trust { padding: 80px 0; text-align: center; }
-  .trust p { max-width: 60ch; margin: 0 auto 16px; font-size: 17px; color: var(--muted); }
+  .trust { background: var(--card); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 96px 0; text-align: center; }
+  .trust p { max-width: 58ch; margin: 0 auto 16px; font-size: 17px; color: var(--muted); }
   .trust p strong { color: var(--ink); }
-  code.inline {
-    font-family: 'JetBrains Mono', monospace; font-size: 14px;
-    background: var(--ink); color: var(--paper); padding: 10px 18px; border-radius: 8px; display: inline-block; margin-top: 8px;
-  }
+  code.inline { font-family: 'JetBrains Mono', monospace; font-size: 14px; background: var(--ink); color: var(--paper); padding: 12px 20px; border-radius: 9px; display: inline-block; margin-top: 10px; }
 
-  /* ── footer ── */
-  footer { padding: 48px 0 64px; text-align: center; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
+  /* ── faq ── */
+  .faq { padding: 96px 0; max-width: 760px; margin: 0 auto; }
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 13px; padding: 18px 22px; margin-bottom: 12px; }
+  summary { font-weight: 600; cursor: pointer; font-size: 16px; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  summary::after { content: "+"; font-size: 22px; color: var(--muted); transition: transform .2s; }
+  details[open] summary::after { transform: rotate(45deg); }
+  details p { margin-top: 12px; color: var(--muted); font-size: 15px; }
+
+  /* ── final cta ── */
+  .final { background: var(--ink); color: var(--paper); text-align: center; padding: 100px 0; }
+  .final h2 { font-family: 'Newsreader', serif; font-weight: 800; font-size: clamp(32px, 4.6vw, 52px); }
+  .final p { color: #c9c2b6; margin: 16px auto 34px; max-width: 46ch; }
+  .final .btn-primary { background: var(--paper); color: var(--ink); }
+
+  footer { padding: 44px 0 60px; text-align: center; color: var(--muted); font-size: 14px; }
   footer a { margin: 0 10px; }
 </style>
 </head>
 <body>
 
+<nav>
+  <div class="wrap nav-in">
+    <a class="brand" href="#">🎙️ ItsMyPA</a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#compare">Compare</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/simpaira/itsmypa">GitHub</a>
+      <a class="nav-cta" href="https://github.com/simpaira/itsmypa/releases/latest">Download</a>
+    </div>
+  </div>
+</nav>
+
 <section class="hero">
   <div class="wrap">
-    <div class="kicker">🎙️ ItsMyPA — private AI meeting notes for macOS</div>
+    <span class="pill"><span class="dot"></span> 100% on-device · nothing ever uploaded</span>
     <h1>Your AI notetaker is <em>wearing a wire.</em></h1>
-    <p class="sub">Every cloud notetaker uploads your meetings — your negotiations, your
-      health calls, your customers' secrets — to servers you don't control.
-      <strong>ItsMyPA transcribes, separates speakers, and writes structured notes
-      entirely on your Mac.</strong> Nothing leaves your machine. Ever.</p>
+    <p class="sub">Cloud notetakers upload your meetings to servers you don't control.
+      <strong>ItsMyPA records, transcribes, and writes structured notes entirely on your
+      Mac</strong> — free, no account, works offline.</p>
     <div class="cta-row">
-      <a class="btn btn-primary" href="https://github.com/simpaira/itsmypa/releases/latest">⬇️ Download for macOS</a>
-      <a class="btn btn-ghost" href="https://github.com/simpaira/itsmypa">Read the source ↗</a>
+      <a class="btn btn-primary" href="https://github.com/simpaira/itsmypa/releases/latest">⬇️&nbsp; Download for macOS</a>
+      <a class="btn btn-ghost" href="https://github.com/simpaira/itsmypa">Read the source&nbsp;↗</a>
     </div>
-    <div class="fineprint">Free · open source · no account · Apple Silicon, macOS 13+</div>
+    <div class="fineprint">free · open source · Apple Silicon · macOS 13+</div>
+  </div>
+</section>
+
+<section class="stage">
+  <div class="wrap">
+    <div class="window reveal">
+      <div class="titlebar">
+        <span class="dot3" style="background:#ff5f57"></span>
+        <span class="dot3" style="background:#febc2e"></span>
+        <span class="dot3" style="background:#28c840"></span>
+        <span class="t">ItsMyPA</span>
+      </div>
+      <div class="app-body">
+        <aside class="sidebar">
+          <div class="sec">Today</div>
+          <div class="sitem active">Q3 Pricing Review<small>10:02 · 47 min</small></div>
+          <div class="sitem">Standup — Core team<small>09:15 · 12 min</small></div>
+          <div class="sec">Yesterday</div>
+          <div class="sitem">1:1 with Dana<small>16:30 · 28 min</small></div>
+          <div class="sitem">Sales call — Acme Corp<small>11:00 · 39 min</small></div>
+        </aside>
+        <main class="note">
+          <span class="rec-pill"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span> REC 47:12</span>
+          <h4>Q3 Pricing Review</h4>
+          <div class="meta">Jul 17 · 47 min · You + 3 speakers</div>
+          <div class="tabs"><span class="tab on">Notes</span><span class="tab">Transcript</span><span class="tab">My notes</span></div>
+          <div class="ncard">
+            <h5>Executive summary</h5>
+            <p>Team agreed to hold the base tier at $29 and introduce an annual plan at 2 months free. Launch moves to the first week of September pending the billing migration.</p>
+          </div>
+          <div class="ncard">
+            <h5>Action items</h5>
+            <div class="check"><span class="box done"></span><span>Draft annual-plan pricing page &nbsp;<span class="tag">Dana</span></span></div>
+            <div class="check"><span class="box"></span><span>Confirm billing migration date with vendor &nbsp;<span class="tag">You</span></span></div>
+            <div class="check"><span class="box"></span><span>Share competitor pricing table &nbsp;<span class="tag">Speaker 3</span></span></div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="strip reveal">
+  <div class="cap">Captures any meeting app — no bot joins your call</div>
+  <div class="apps">
+    <span class="appchip">Zoom</span><span class="appchip">Google Meet</span>
+    <span class="appchip">Microsoft Teams</span><span class="appchip">Slack Huddles</span>
+    <span class="appchip">Webex</span><span class="appchip">In-person 🎙️</span>
   </div>
 </section>
 
 <section class="rage">
   <div class="wrap">
-    <h2>That friendly bot in your meeting? It reports to someone else.</h2>
-    <p>The AI notetaker business model is simple: you invite their recorder into your
-      most sensitive conversations, the audio ships to <strong>their servers</strong>, and
-      your meetings become rows in <strong>their database</strong> — governed by a privacy
-      policy that can change, sold back to you for <strong>$8–30 a month, forever</strong>.</p>
-    <p>Your salary negotiation. Your startup's roadmap. Your client's confidential
-      numbers. Your doctor's advice. All of it, on someone else's computer.</p>
-    <p class="zinger">It's your meeting. It should be your machine.</p>
+    <h2 class="reveal">That friendly bot in your meeting? It reports to someone else.</h2>
+    <p class="reveal">The AI notetaker business model is simple: you invite their recorder into your most
+      sensitive conversations, the audio ships to <strong>their servers</strong>, and your meetings
+      become rows in <strong>their database</strong> — governed by a privacy policy that can change,
+      sold back to you for <strong>$8–30 a month, forever</strong>.</p>
+    <p class="reveal">Your salary negotiation. Your startup's roadmap. Your client's confidential numbers.
+      Your doctor's advice. All of it, on someone else's computer.</p>
+    <p class="zinger reveal">It's your meeting. It should be your machine.</p>
   </div>
 </section>
 
-<section class="compare">
+<section class="features" id="features">
   <div class="wrap">
-    <h2 class="section">Same features. One crucial difference.</h2>
-    <div class="table-scroll">
-    <table>
-      <tr><th></th><th>☁️ Cloud notetakers</th><th>🔒 ItsMyPA</th></tr>
-      <tr><td>Where your audio goes</td><td class="bad">Their servers</td><td class="good">Never leaves your Mac</td></tr>
-      <tr><td>Price</td><td class="bad">$8–30/mo, forever</td><td class="good">Free</td></tr>
-      <tr><td>Account required</td><td class="bad">Always</td><td class="good">No</td></tr>
-      <tr><td>A bot joins your call</td><td class="bad">Usually</td><td class="good">Never — captures locally</td></tr>
-      <tr><td>Works offline</td><td class="bad">No</td><td class="good">Yes</td></tr>
-      <tr><td>Who can read your meetings</td><td class="bad">Them · vendors · subpoenas</td><td class="good">You</td></tr>
-    </table>
+    <h2 class="section reveal">Everything the cloud tools do.<br>On your hardware.</h2>
+    <p class="section-sub reveal">Whisper transcription, speaker diarization, and a local LLM — the full stack runs on Apple Silicon.</p>
+    <div class="grid">
+      <div class="card reveal"><div class="emoji">🎚️</div><h3>One-button capture</h3><p>Records your mic and the computer's meeting audio natively. No bot joining your call, no tab-sharing dialogs.</p></div>
+      <div class="card reveal"><div class="emoji">🗣️</div><h3>Who-said-what transcripts</h3><p>"You" is labeled automatically; everyone else is separated on-device. Rename speakers with one click.</p></div>
+      <div class="card reveal"><div class="emoji">📋</div><h3>Structured notes</h3><p>Executive summary, key decisions, action items with owners and checkboxes — cards you can scan, not a wall of text.</p></div>
+      <div class="card reveal"><div class="emoji">✍️</div><h3>Scratchpad + enhance</h3><p>Jot rough bullets during the meeting; AI expands each line with decisions, numbers, and quotes from the transcript.</p></div>
+      <div class="card reveal"><div class="emoji">💬</div><h3>Ask your meeting anything</h3><p>"What did we agree about pricing?" Chat with any transcript — answered locally by an on-device LLM.</p></div>
+      <div class="card reveal"><div class="emoji">📧</div><h3>Follow-up email in one click</h3><p>A recap with decisions and action items, grounded in the transcript. Plus templates, search, and Markdown export.</p></div>
     </div>
   </div>
 </section>
 
-<section class="features">
+<section class="how" id="how">
   <div class="wrap">
-    <h2 class="section">Everything the cloud tools do — on your hardware</h2>
-    <div class="grid">
-      <div class="card"><div class="emoji">🎚️</div><h3>One-button capture</h3><p>Records your mic and the computer's meeting audio (Zoom, Meet, Teams — anything) natively. No bot in your call.</p></div>
-      <div class="card"><div class="emoji">🗣️</div><h3>Who-said-what transcripts</h3><p>Whisper transcription with speaker separation. "You" is labeled automatically; everyone else gets told apart on-device.</p></div>
-      <div class="card"><div class="emoji">📋</div><h3>Structured notes, not word-soup</h3><p>Executive summary, key decisions, action items with owners and checkboxes. Rendered as cards you can actually scan.</p></div>
-      <div class="card"><div class="emoji">✍️</div><h3>Scratchpad + enhance</h3><p>Jot rough bullets during the meeting. AI expands each line with the decisions, numbers, and quotes from the transcript.</p></div>
-      <div class="card"><div class="emoji">💬</div><h3>Ask your meeting anything</h3><p>"What did we agree about pricing?" Chat with any transcript — answered locally by an on-device LLM.</p></div>
-      <div class="card"><div class="emoji">📧</div><h3>One-click follow-up email</h3><p>Recap email with decisions and action items, grounded in the transcript. Plus templates, search, auto-titles, Markdown export.</p></div>
+    <h2 class="section reveal">Three steps. Zero uploads.</h2>
+    <p class="section-sub reveal">First launch downloads the AI models once (~5 GB). After that, airplane mode works.</p>
+    <div class="steps">
+      <div class="step reveal"><h3>Press record</h3><p>ItsMyPA captures your mic and the meeting's audio from any app — Zoom, Meet, Teams, or a room full of people.</p></div>
+      <div class="step reveal"><h3>Speak like a human</h3><p>Whisper transcribes and diarization separates every voice — live, on your own silicon.</p></div>
+      <div class="step reveal"><h3>Get the notes</h3><p>Summary, decisions, and action items appear the moment you stop. Auto-saved, searchable, exportable.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="compare" id="compare">
+  <div class="wrap">
+    <h2 class="section reveal">Same features. One crucial difference.</h2>
+    <p class="section-sub reveal">Everything they charge a subscription for — minus the part where your audio lives on their servers.</p>
+    <div class="table-scroll reveal">
+      <table>
+        <tr><th></th><th>☁️ Cloud notetakers</th><th>🔒 ItsMyPA</th></tr>
+        <tr><td>Where your audio goes</td><td class="bad">Their servers</td><td class="good">Never leaves your Mac</td></tr>
+        <tr><td>Price</td><td class="bad">$8–30/mo, forever</td><td class="good">Free</td></tr>
+        <tr><td>Account required</td><td class="bad">Always</td><td class="good">No</td></tr>
+        <tr><td>A bot joins your call</td><td class="bad">Usually</td><td class="good">Never — captures locally</td></tr>
+        <tr><td>Works offline</td><td class="bad">No</td><td class="good">Yes</td></tr>
+        <tr><td>Who can read your meetings</td><td class="bad">Them · vendors · subpoenas</td><td class="good">You</td></tr>
+      </table>
     </div>
   </div>
 </section>
 
 <section class="trust">
   <div class="wrap">
-    <h2 class="section">"Unsigned app? Why should I trust you?"</h2>
-    <p>Because you don't have to. <strong>The entire source code is public.</strong>
-      Read it, build it yourself, or watch its network traffic — after the one-time
-      model download, there isn't any. A $99 Apple certificate proves someone paid
-      Apple. Open source proves what the app actually does.</p>
-    <p>Prefer zero security dialogs? Install via Homebrew:</p>
-    <code class="inline">brew install --cask simpaira/tap/itsmypa</code>
+    <h2 class="section reveal">"Unsigned app? Why should I trust you?"</h2>
+    <p class="reveal" style="margin-top:18px">Because you don't have to. <strong>The entire source code is public.</strong>
+      Read it, build it yourself, or watch its network traffic — after the one-time model
+      download, there isn't any. A $99 Apple certificate proves someone paid Apple.
+      Open source proves what the app actually does.</p>
+    <p class="reveal">Prefer zero security dialogs? Install via Homebrew:</p>
+    <code class="inline reveal">brew install --cask simpaira/tap/itsmypa</code>
+  </div>
+</section>
+
+<section class="faq" id="faq">
+  <h2 class="section reveal">Questions, answered</h2>
+  <div style="margin-top:40px">
+    <details class="reveal"><summary>Is it really free? What's the catch?</summary>
+      <p>Really free, open source, no account. If it takes off we may add an optional paid tier for power features — the core private notetaker stays free. You can also support development on GitHub.</p></details>
+    <details class="reveal"><summary>Does anything ever leave my Mac?</summary>
+      <p>No. The one exception is the first launch, which downloads the AI models (~5 GB, one time) from public model repositories. After that, everything — recording, transcription, summaries, chat — runs locally. Airplane mode works.</p></details>
+    <details class="reveal"><summary>Why does macOS warn me when I install it?</summary>
+      <p>We haven't paid Apple's $99/year code-signing fee yet. The app isn't malware — the full source is public, which proves more than a certificate does. System Settings → Privacy & Security → "Open Anyway", or install via Homebrew. Signing is planned.</p></details>
+    <details class="reveal"><summary>What are the requirements?</summary>
+      <p>An Apple Silicon Mac (M1 or newer), macOS 13+, 16 GB RAM recommended, and ~6 GB of disk for the app and models.</p></details>
+    <details class="reveal"><summary>Why is Screen Recording permission needed?</summary>
+      <p>macOS gates <em>system-audio</em> capture (the other people in your call) behind the Screen Recording permission. ItsMyPA never captures or stores your screen — only the audio. Skip it and recording still works, mic-only.</p></details>
+    <details class="reveal"><summary>Which languages does it support?</summary>
+      <p>Whisper supports ~100 languages. English is strongest; for non-Latin-script languages (Hindi, Arabic, Chinese, Japanese…), switch to a larger Whisper model in Settings for noticeably better accuracy.</p></details>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <h2 class="reveal">Take your meetings back.</h2>
+    <p class="reveal">Free, open source, and none of anyone else's business — literally.</p>
+    <a class="btn btn-primary reveal" href="https://github.com/simpaira/itsmypa/releases/latest">⬇️&nbsp; Download ItsMyPA for macOS</a>
   </div>
 </section>
 
@@ -193,6 +398,13 @@
     </div>
   </div>
 </footer>
+
+<script>
+  const io = new IntersectionObserver((es) => {
+    es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
 
 </body>
 </html>
