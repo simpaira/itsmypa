@@ -1344,6 +1344,14 @@ def generate_title(body: dict):
     return {"title": title}
 
 
+# Greetings and pleasantries must never reach the retrieval/LLM pipeline: a
+# grounded prompt turns "hi" into an unsolicited meeting summary (or worse,
+# a citation of a transcript line where somebody happened to say "hi").
+_SMALLTALK_RE = re.compile(
+    r"^(hi+|hii+|hello+|hey+|yo|sup|howdy|good\s*(morning|afternoon|evening)|"
+    r"thanks?|thank\s*you|thx|ty|ok(ay)?|cool|nice|great|got\s*it|bye|goodbye|"
+    r"test(ing)?|how\s*are\s*you\??)[\s!.?,]*$", re.I)
+
 @app.post("/chat")
 async def chat(body: dict):
     transcript = (body.get("transcript") or "").strip()
@@ -1355,11 +1363,18 @@ async def chat(body: dict):
     if not question:
         raise HTTPException(400, "No question provided")
 
+    if _SMALLTALK_RE.match(question):
+        return StreamingResponse(iter((
+            "Hi! Ask me anything about this meeting — decisions, action items, "
+            "or who said what.",)), media_type="text/plain")
+
     context = select_chat_context(transcript, question)
     system = (
         "You are a helpful assistant answering questions about a meeting. "
         "Answer ONLY using the meeting transcript provided below — never invent facts, names, or numbers. "
         "If the answer isn't in the transcript, say plainly that it wasn't discussed. "
+        "If the user's message is small talk or not a question about the meeting, reply in one short "
+        "friendly sentence and offer to answer questions about the meeting — never summarize unprompted. "
         "Reference speaker labels (e.g. 'Speaker 2') when relevant. Be concise and direct.\n\n"
         f"---\nTRANSCRIPT:\n{context}\n---"
     )
@@ -1480,8 +1495,11 @@ ASK_ANSWER_PROMPT = (
     "You answer questions from the user's saved meeting notes. Today is {{TODAY}}.\n"
     "Use ONLY the meeting excerpts below; each is headed [Meeting title — date].\n"
     "- Answer directly and concisely, in Markdown.\n"
-    "- Say which meeting (title and date) each fact comes from.\n"
-    "- If the excerpts don't answer the question, say so plainly — never invent details.\n\n"
+    "- Mention which meeting each fact comes from naturally in prose (e.g. \"In the Q3 review "
+    "on 2026-07-01, …\") — never reproduce the bracketed [ … ] header format itself.\n"
+    "- If the excerpts don't answer the question, say so plainly — never invent details.\n"
+    "- If the message is small talk rather than a question about meetings, reply in one short "
+    "friendly sentence inviting a question — do not mention or cite any meeting.\n\n"
     "EXCERPTS:\n{{CONTEXT}}\n\nQuestion: {{QUESTION}}"
 )
 
@@ -1490,6 +1508,11 @@ async def ask_meetings(body: dict):
     question = ((body or {}).get("question") or "").strip()
     if not question:
         raise HTTPException(400, "No question provided")
+
+    if _SMALLTALK_RE.match(question):
+        return StreamingResponse(iter((
+            "Hi! Ask me anything about your saved meetings — decisions, action "
+            "items, who said what, and when.",)), media_type="text/plain")
 
     def stream():
         if _llm is None:

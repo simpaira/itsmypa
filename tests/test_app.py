@@ -279,3 +279,27 @@ def test_group_spans_merges_same_speaker_and_respects_cap():
     # merged windows slice the right samples
     sp, start, end, chunk = chunks[0]
     assert len(chunk) == int(end * sr) - int(start * sr)
+
+
+def test_chat_smalltalk_never_reaches_llm(client):
+    for msg in ("hi", "Hello!", "thanks", "how are you?", "ok"):
+        r = client.post("/chat", json={"transcript": "Speaker 1: we ship Friday.", "question": msg})
+        assert r.status_code == 200
+        assert "Ask me anything about this meeting" in r.text
+        # must NOT summarize or error about the missing model
+        assert "model" not in r.text.lower()
+
+
+def test_ask_smalltalk_never_reaches_retrieval(client):
+    for msg in ("hi", "hey!!", "thank you", "good morning"):
+        r = client.post("/ask", json={"question": msg})
+        assert r.status_code == 200
+        assert "your saved meetings" in r.text
+        assert "@@SOURCES@@" not in r.text
+
+
+def test_real_questions_bypass_smalltalk_guard():
+    # These must go to the pipeline, not the canned greeting.
+    for q in ("hi, what did we decide about pricing?", "who said thanks to the client?",
+              "what are the action items"):
+        assert not ms._SMALLTALK_RE.match(q)
