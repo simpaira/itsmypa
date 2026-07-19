@@ -133,5 +133,6 @@ download to the app-data dir on first run (macOS:
 ## Support the project
 
 ItsMyPA is free. If it saved you a subscription, you can
-[buy me a coffee](https://github.com/sponsors/simpaira) — the first goal is
-the $99 Apple fee so the Gatekeeper warning goes away for everyone.
+[**buy me a coffee on Ko-fi** ☕](https://ko-fi.com/simpaira) — the first goal
+is Apple's $99 signing fee, so the security warning at install goes away for
+everyone. Every coffee is a brick in that wall.
