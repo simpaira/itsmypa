@@ -552,7 +552,7 @@
   <div class="main">
     <div class="topbar">
       <button class="sidebar-toggle" onclick="toggleSidebar()" id="sidebar-toggle-icon"></button>
-      <div class="topbar-label" id="view-title">New meeting</div>
+      <div class="topbar-label" id="view-title"></div>
       <div class="topbar-actions" id="topbar-actions"></div>
     </div>
     <div class="content" id="content"></div>
@@ -1040,7 +1040,7 @@ function showRecorder(){
   curNoteId=null; curTranscript=''; curSummary=''; curSegments=null; curActionStatus={};
   curEnhanced=''; pendingMeetingTitle='';
   curScratchpad = localStorage.getItem('ms_scratchpad') || '';   // survives crashes/refreshes
-  document.getElementById('view-title').textContent='New meeting';
+  document.getElementById('view-title').textContent='';
   document.getElementById('topbar-actions').innerHTML='';
   document.querySelectorAll('.note-item').forEach(el=>el.classList.remove('active'));
   updateChatFab(); resetChat(); closeChat();
