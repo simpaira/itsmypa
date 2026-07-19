@@ -1,6 +1,6 @@
 [package]
 name = "itsmypa"
-version = "0.1.1"
+version = "0.1.2"
 description = "ItsMyPA — your private AI meeting PA"
 edition = "2021"
 
