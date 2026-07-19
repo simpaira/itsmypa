@@ -10,6 +10,10 @@ Records, transcribes, tells speakers apart, and writes structured notes —
 
 [**⬇️ Download for macOS (Apple Silicon)**](https://github.com/simpaira/itsmypa/releases/latest) · [Install guide](INSTALL.md) · [How it works](#how-it-works)
 
+![ItsMyPA demo — record a meeting, get structured notes with speaker separation](docs/demo.gif)
+
+*Real capture: recorded, transcribed, diarized, and summarized 100% on-device.*
+
 </div>
 
 ---
