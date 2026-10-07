@@ -1,0 +1,32 @@
+name: engine
+
+# Builds and unit-tests the Rust engine on every supported desktop OS. This is
+# the P0 gate for the Python → Rust migration: sherpa-onnx (prebuilt static
+# libs) + llama.cpp must compile and link together on macOS and Windows.
+on:
+  push:
+    branches: [main, rust-engine]
+    paths: ["src-tauri/**", ".github/workflows/engine.yml"]
+  pull_request:
+    paths: ["src-tauri/**", ".github/workflows/engine.yml"]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Build engine + examples
+        run: cargo build --release -p itsmypa-engine --examples
+      - name: Unit tests
+        run: cargo test --release -p itsmypa-engine

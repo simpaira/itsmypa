@@ -1,0 +1,5 @@
+# sherpa-onnx ships its Windows static libs built against the static C runtime
+# (/MT). Link everything — Rust and llama.cpp's CMake build — the same way, or
+# MSVC fails with RuntimeLibrary mismatches (LNK2038).
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]
