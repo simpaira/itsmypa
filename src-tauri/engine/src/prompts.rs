@@ -1,5 +1,5 @@
-//! Every LLM prompt, copied verbatim from app.py so notes come out exactly as
-//! before. `{{NAME}}` placeholders are filled with [`fill`].
+//! Every LLM prompt. All but the enhance prompts are copied verbatim from
+//! app.py so notes come out exactly as before. `{{NAME}}` placeholders are filled with [`fill`].
 //!
 //! Every summary — direct or map-reduced — is forced into one template so the
 //! UI can parse it into Executive Summary / Decisions / Action Items / Topics
@@ -55,21 +55,23 @@ pub fn summary_flavor(template: &str) -> &'static str {
     }
 }
 
-/// "Enhance my notes": the user's rough bullets guide the AI; the output
-/// repeats each user note verbatim followed by expansions from the transcript.
-pub const ENHANCE_PROMPT: &str = "You are enhancing a user's rough meeting notes using the meeting transcript.\n\
-For EACH line or bullet of the user's notes, output exactly:\n\
-### <the user's note, repeated verbatim>\n\
-- 2 to 5 factual bullets expanding that note with specifics from the transcript: \
-decisions, numbers, owners, dates, and short quotes.\n\
-Keep the user's original order. If a note has no match in the transcript, output a \
-single bullet: 'Not discussed in the transcript.'\n\
-After covering every user note, add one final section:\n\
-### Also worth noting\n\
-- up to 4 bullets for important points the user's notes missed. If none, skip this section.\n\
-Rules: never invent facts, names, or numbers not present in the transcript. \
-Output ONLY the format above — no preamble, no closing remarks.\n\n\
----\nUSER NOTES:\n{{NOTES}}\n---\nTRANSCRIPT:\n{{TRANSCRIPT}}\n---";
+/// "Enhance my notes", asked one note at a time: small models follow a
+/// simple per-note request far more reliably than the old all-notes-at-once
+/// layout prompt (which came back with mangled headings). The engine builds
+/// the "### note" layout itself.
+pub const ENHANCE_NOTE_PROMPT: &str = "Here are lines from a meeting transcript.\n\n\
+---\nTRANSCRIPT:\n{{TRANSCRIPT}}\n---\n\n\
+During the meeting the user wrote this rough note: \"{{NOTE}}\"\n\
+What does the transcript say about \"{{NOTE}}\"? Answer in 1 to 5 short factual bullets with the specifics: \
+decisions, numbers, owners, dates, and short quotes. Each bullet starts with \"- \". \
+Use only facts stated in the transcript. Only if the transcript says nothing at all about it, \
+write: \"- Not discussed in the transcript.\" Output ONLY the bullets.";
+
+/// Key points of a meeting; the engine then drops the ones the user's notes
+/// already cover to build "Also worth noting".
+pub const KEY_POINTS_PROMPT: &str = "List the 6 most important points of the meeting below: decisions, action items with owners, \
+numbers, and dates. One short bullet each, starting with \"- \". Never invent facts. Output ONLY the bullets.\n\n\
+---\nTRANSCRIPT:\n{{TRANSCRIPT}}\n---";
 
 pub const EMAIL_PROMPT: &str = "Write a short, professional follow-up email for the meeting below.\n\
 Rules:\n\
