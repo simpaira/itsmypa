@@ -11,5 +11,8 @@
   <!-- Required so the webview can request the microphone for recording -->
   <key>NSMicrophoneUsageDescription</key>
   <string>ItsMyPA records the meetings you choose to record. Audio is transcribed entirely on your device and never leaves it.</string>
+  <!-- Core Audio process taps (macOS 14.6+): the other side of the call -->
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>ItsMyPA records your computer's audio during meetings you choose to record, so it can transcribe the other participants. Audio never leaves your device.</string>
 </dict>
 </plist>

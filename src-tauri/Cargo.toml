@@ -5,7 +5,7 @@ description = "ItsMyPA — your private AI meeting PA"
 edition = "2021"
 
 [workspace]
-members = [".", "engine"]
+members = [".", "engine", "capture"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

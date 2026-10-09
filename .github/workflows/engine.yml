@@ -1,8 +1,9 @@
 name: engine
 
-# Builds and unit-tests the Rust engine on every supported desktop OS. This is
-# the P0 gate for the Python → Rust migration: sherpa-onnx (prebuilt static
-# libs) + llama.cpp must compile and link together on macOS and Windows.
+# Builds and unit-tests the Rust engine and capture crates on every supported
+# desktop OS. This is the gate for the Python → Rust migration: sherpa-onnx
+# (prebuilt static libs) + llama.cpp must compile and link together on macOS
+# and Windows, and the capture crate must build against WASAPI.
 on:
   push:
     branches: [main, rust-engine]
@@ -27,7 +28,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-      - name: Build engine + examples
-        run: cargo build --release -p itsmypa-engine --examples
+      - name: Build engine + capture + examples
+        run: cargo build --release -p itsmypa-engine -p itsmypa-capture --examples
       - name: Unit tests
-        run: cargo test --release -p itsmypa-engine
+        run: cargo test --release -p itsmypa-engine -p itsmypa-capture
