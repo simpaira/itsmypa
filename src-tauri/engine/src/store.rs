@@ -151,12 +151,12 @@ impl Store {
         Ok(result.imported)
     }
 
-    fn meta(&self, key: &str) -> Result<Option<String>> {
+    pub fn meta(&self, key: &str) -> Result<Option<String>> {
         let db = self.db.lock().unwrap();
         Ok(db.query_row("SELECT value FROM meta WHERE key = ?1", [key], |r| r.get(0)).optional()?)
     }
 
-    fn set_meta(&self, key: &str, value: &str) -> Result<()> {
+    pub fn set_meta(&self, key: &str, value: &str) -> Result<()> {
         let db = self.db.lock().unwrap();
         db.execute("INSERT OR REPLACE INTO meta(key, value) VALUES (?1, ?2)", [key, value])?;
         Ok(())

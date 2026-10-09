@@ -13,6 +13,7 @@ pub mod notes;
 pub mod paths;
 pub mod pipeline;
 pub mod prompts;
+pub mod settings;
 pub mod store;
 
 pub const SAMPLE_RATE: i32 = 16_000;
