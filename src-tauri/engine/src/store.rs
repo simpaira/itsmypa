@@ -13,6 +13,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -56,6 +57,8 @@ pub struct ImportResult {
 
 pub struct Store {
     db: Mutex<Connection>,
+    /// Bumped on every change, so caches (the "ask" index) know to rebuild.
+    version: AtomicU64,
 }
 
 const SCHEMA: &str = r#"
@@ -132,7 +135,7 @@ impl Store {
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.execute_batch(SCHEMA)?;
-        Ok(Self { db: Mutex::new(conn) })
+        Ok(Self { db: Mutex::new(conn), version: AtomicU64::new(0) })
     }
 
     /// Copy meetings from the Python engine's notes.json, once. The file is
@@ -157,6 +160,15 @@ impl Store {
         let db = self.db.lock().unwrap();
         db.execute("INSERT OR REPLACE INTO meta(key, value) VALUES (?1, ?2)", [key, value])?;
         Ok(())
+    }
+
+    /// Changes whenever any meeting is added, edited or deleted.
+    pub fn version(&self) -> u64 {
+        self.version.load(Ordering::SeqCst)
+    }
+
+    fn changed(&self) {
+        self.version.fetch_add(1, Ordering::SeqCst);
     }
 
     /// All meetings, newest first.
@@ -188,6 +200,7 @@ impl Store {
             note.action_status = Value::Object(Default::default());
         }
         self.insert(&self.db.lock().unwrap(), &note)?;
+        self.changed();
         Ok(note)
     }
 
@@ -239,12 +252,27 @@ impl Store {
                 n.status
             ],
         )?;
+        drop(db);
+        self.changed();
         Ok(Some(n))
+    }
+
+    /// Set a meeting's date (ISO 8601). For imports and tests; meetings
+    /// created normally are stamped with the current time.
+    pub fn set_date(&self, id: &str, date: &str) -> Result<()> {
+        let db = self.db.lock().unwrap();
+        db.execute("UPDATE notes SET date = ?2 WHERE id = ?1", [id, date])?;
+        drop(db);
+        self.changed();
+        Ok(())
     }
 
     pub fn delete(&self, id: &str) -> Result<bool> {
         let db = self.db.lock().unwrap();
-        Ok(db.execute("DELETE FROM notes WHERE id = ?1", [id])? > 0)
+        let deleted = db.execute("DELETE FROM notes WHERE id = ?1", [id])? > 0;
+        drop(db);
+        self.changed();
+        Ok(deleted)
     }
 
     /// Ids of meetings matching a full-text query, best match first.
@@ -315,6 +343,8 @@ impl Store {
             imported += 1;
         }
         tx.commit()?;
+        drop(db);
+        self.changed();
         Ok(ImportResult { imported, skipped })
     }
 }
