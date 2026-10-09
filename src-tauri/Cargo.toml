@@ -12,9 +12,13 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
+itsmypa-engine = { path = "engine" }
+itsmypa-capture = { path = "capture" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+dirs = "6"
 
 [profile.release]
 opt-level = "s"
