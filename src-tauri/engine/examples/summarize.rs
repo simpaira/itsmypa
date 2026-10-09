@@ -1,10 +1,10 @@
-//! Stream structured notes for a transcript with the app's real summary
-//! prompt — used to compare candidate models.
+//! Stream structured notes for a transcript (long meetings are condensed in
+//! stages) — also used to compare candidate models.
 //!
 //!   cargo run --release -p itsmypa-engine --example summarize -- transcript.txt [model.gguf]
 
-use itsmypa_engine::llm::{Llm, Message, DEFAULT_N_CTX};
-use itsmypa_engine::{models, paths, prompts};
+use itsmypa_engine::llm::{Llm, DEFAULT_N_CTX};
+use itsmypa_engine::{models, notes, paths};
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -26,13 +26,12 @@ fn main() -> anyhow::Result<()> {
     let llm = Llm::load(&gguf, DEFAULT_N_CTX)?;
     eprintln!("loaded {} in {:.1}s", llm.name, t0.elapsed().as_secs_f32());
 
-    let prompt = prompts::fill(&prompts::summary_prompt(), &[("TRANSCRIPT", &transcript)]);
-    eprintln!("prompt: {} tokens", llm.count_tokens(&prompt));
+    eprintln!("transcript: {} words, {} tokens", transcript.split_whitespace().count(), llm.count_tokens(&transcript));
 
     let t1 = Instant::now();
     let mut first: Option<f32> = None;
     let mut n = 0usize;
-    let out = llm.chat(&[Message::user(prompt)], 1200, 0.15, &mut |piece| {
+    let out = notes::summarize(&llm, &transcript, "general", &mut |piece| {
         first.get_or_insert(t1.elapsed().as_secs_f32());
         n += 1;
         print!("{piece}");
