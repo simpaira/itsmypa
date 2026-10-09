@@ -1815,7 +1815,9 @@ dependencies = [
  "dirs",
  "hound",
  "llama-cpp-2",
+ "sha2",
  "sherpa-onnx",
+ "ureq",
 ]
 
 [[package]]

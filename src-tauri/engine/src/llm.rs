@@ -64,6 +64,27 @@ impl Llm {
         self.model.vocab().tokenize(text.as_bytes(), false, false).len()
     }
 
+    /// Turn messages into the model's prompt text using its own chat template.
+    fn render(&self, messages: &[Message]) -> Result<String> {
+        let template = self.model.chat_template(None).context("model has no chat template")?;
+        // Gemma 4's `<|turn>role … <turn|>` format is newer than llama.cpp's
+        // built-in template list (which only knows Gemma 1–3), so write it here.
+        if template.to_str().is_ok_and(|t| t.contains("<|turn>")) {
+            let mut p = String::from("<bos>");
+            for m in messages {
+                let role = if m.role == "assistant" { "model" } else { m.role };
+                p.push_str(&format!("<|turn>{role}\n{}<turn|>\n", m.content.trim()));
+            }
+            p.push_str("<|turn>model\n");
+            return Ok(p);
+        }
+        let chat = messages
+            .iter()
+            .map(|m| LlamaChatMessage::new(m.role.to_string(), m.content.clone()))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(self.model.apply_chat_template(&template, &chat, true)?)
+    }
+
     /// Run a chat completion, calling `on_piece` with each decoded text piece
     /// as it streams. Returns the full text. `on_piece` returning false stops
     /// generation early (the UI closed the stream).
@@ -74,12 +95,7 @@ impl Llm {
         temperature: f32,
         on_piece: &mut dyn FnMut(&str) -> bool,
     ) -> Result<String> {
-        let template = self.model.chat_template(None).context("model has no chat template")?;
-        let chat = messages
-            .iter()
-            .map(|m| LlamaChatMessage::new(m.role.to_string(), m.content.clone()))
-            .collect::<Result<Vec<_>, _>>()?;
-        let prompt = self.model.apply_chat_template(&template, &chat, true)?;
+        let prompt = self.render(messages)?;
         let vocab = self.model.vocab();
         let tokens = vocab.tokenize(prompt.as_bytes(), false, true);
 

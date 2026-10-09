@@ -6,7 +6,9 @@ pub mod asr;
 pub mod audio;
 pub mod diarize;
 pub mod llm;
+pub mod models;
 pub mod paths;
 pub mod pipeline;
+pub mod prompts;
 
 pub const SAMPLE_RATE: i32 = 16_000;
