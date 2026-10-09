@@ -10,6 +10,7 @@ use itsmypa_engine::store::{Note, NotePatch};
 use serde::Serialize;
 use serde_json::{json, Value};
 
+use crate::jobs::Input;
 use crate::state::AppState;
 
 #[derive(Debug, Serialize)]
@@ -88,14 +89,74 @@ pub fn handle(state: &AppState, method: &str, path: &str, body: Option<Value>) -
             Ok(json!({"ok": true, "imported": r.imported, "skipped": r.skipped}))
         }
 
-        // Wired in later groups (recording, calendar); safe placeholders so the
-        // home screen loads.
+        ("POST", ["recording", "start"]) => {
+            #[derive(serde::Deserialize)]
+            struct Start {
+                mic: bool,
+                system: bool,
+            }
+            let s = parse::<Start>(body)?;
+            state.recorder.start(s.mic, s.system).map_err(|e| ApiError::new(500, format!("Could not start recording: {e:#}")))
+        }
+        ("GET", ["recording", "level"]) => Ok(state.recorder.level()),
+        ("POST", ["recording", "pause"]) => {
+            state.recorder.set_paused(true)?;
+            Ok(json!({"ok": true}))
+        }
+        ("POST", ["recording", "resume"]) => {
+            state.recorder.set_paused(false)?;
+            Ok(json!({"ok": true}))
+        }
+        ("POST", ["recording", "stop"]) => {
+            let f = state.recorder.stop()?;
+            let out = json!({"recording_id": f.id, "duration": f.duration_secs});
+            state.finished.lock().unwrap().insert(f.id.clone(), f);
+            Ok(out)
+        }
+
+        ("POST", ["transcribe"]) => transcribe(state, body),
+        ("GET", ["jobs", id]) => state.jobs.status(id).ok_or_else(|| ApiError::new(404, "Job not found")),
+
+        // Wired in later groups (recovery, calendar, permissions); safe
+        // placeholders so the home screen loads.
         ("GET", ["recordings"]) => Ok(json!([])),
         ("GET", ["calendar", "upcoming"]) => Ok(json!({"configured": false, "events": [], "error": null})),
         ("GET", ["mic", "status"]) | ("GET", ["system_audio", "status"]) => Ok(json!({"available": true, "state": "granted"})),
 
         _ => Err(ApiError::new(404, format!("{method} {path} is not available yet"))),
     }
+}
+
+/// Queue a finished recording (`recording_id`) or an uploaded file
+/// (`audio.upload_id`, see the `upload` command) for transcription.
+fn transcribe(state: &AppState, body: Option<Value>) -> ApiResult {
+    if state.models.asr.lock().unwrap().is_none() {
+        let msg = if state.models_loading() {
+            "Still warming up the AI models — try again in a few seconds."
+        } else {
+            "Transcription models are not loaded — check Settings."
+        };
+        return Err(ApiError::new(503, msg));
+    }
+    #[derive(serde::Deserialize)]
+    struct UploadRef {
+        upload_id: String,
+    }
+    #[derive(serde::Deserialize)]
+    struct Req {
+        recording_id: Option<String>,
+        audio: Option<UploadRef>,
+    }
+    let req = parse::<Req>(body)?;
+    let input = if let Some(id) = req.recording_id {
+        let f = state.finished.lock().unwrap().remove(&id).ok_or_else(|| ApiError::new(404, "Recording not found"))?;
+        Input::Recording(f)
+    } else if let Some(up) = req.audio {
+        Input::Upload(crate::upload_path(&up.upload_id).ok_or_else(|| ApiError::new(400, "Bad upload id"))?)
+    } else {
+        return Err(ApiError::new(400, "No audio was captured."));
+    };
+    Ok(json!({"job_id": state.jobs.enqueue(input)}))
 }
 
 fn health(state: &AppState) -> ApiResult {

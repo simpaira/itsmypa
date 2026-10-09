@@ -45,7 +45,7 @@ pub fn group_spans<'a, S: Copy + PartialEq>(
         .collect()
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub struct Segment {
     pub speaker: String,
     pub text: String,

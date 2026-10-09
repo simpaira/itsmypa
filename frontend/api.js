@@ -14,8 +14,9 @@
   window.addEventListener('error', e => window.__itsmypaErrors.push(String(e.message)));
   window.addEventListener('unhandledrejection', e => window.__itsmypaErrors.push(String(e.reason)));
 
-  // Request body → plain JSON. Form fields become strings; attached files
-  // become {name, text} (backups are JSON text).
+  // Request body → plain JSON. Form fields become strings. An attached
+  // recording ("audio") is sent to the engine as raw bytes and replaced by its
+  // {upload_id}; other attached files become {name, text} (backups are JSON).
   async function toJson(body) {
     if (body == null) return null;
     if (typeof body === 'string') {
@@ -24,7 +25,13 @@
     if (body instanceof FormData) {
       const out = {};
       for (const [key, value] of body.entries()) {
-        out[key] = value instanceof File ? { name: value.name, text: await value.text() } : value;
+        if (key === 'audio' && value instanceof Blob) {
+          const bytes = new Uint8Array(await value.arrayBuffer());
+          const name = value.name || 'audio';
+          out[key] = { upload_id: await invoke('upload', bytes, { headers: { 'x-file-name': name } }) };
+        } else {
+          out[key] = value instanceof File ? { name: value.name, text: await value.text() } : value;
+        }
       }
       return out;
     }

@@ -12,6 +12,10 @@ use itsmypa_engine::settings::{self, Settings};
 use itsmypa_engine::store::Store;
 use itsmypa_engine::paths;
 use serde::Serialize;
+
+use crate::jobs::Jobs;
+use crate::recording::{Finished, Recorder};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -41,6 +45,10 @@ pub struct Models {
 pub struct AppState {
     pub store: Store,
     pub asker: Asker,
+    pub recorder: Recorder,
+    pub jobs: Jobs,
+    /// Recordings stopped but not yet handed to /transcribe, by id.
+    pub finished: Mutex<HashMap<String, Finished>>,
     pub models: Arc<Models>,
     pub setup: Arc<Mutex<Vec<Component>>>,
     pub loading: Arc<AtomicBool>,
@@ -59,10 +67,14 @@ impl AppState {
             eprintln!("Copied {copied} meetings from notes.json");
         }
         settings::import_legacy_env(&store, &data.join(".env"))?;
+        let models = Arc::new(Models::default());
         Ok(Self {
             store,
             asker: Asker::default(),
-            models: Arc::new(Models::default()),
+            recorder: Recorder::default(),
+            jobs: Jobs::start(models.clone()),
+            finished: Mutex::default(),
+            models,
             setup: Arc::new(Mutex::new(Vec::new())),
             loading: Arc::new(AtomicBool::new(true)),
             generation: Arc::new(AtomicU64::new(0)),

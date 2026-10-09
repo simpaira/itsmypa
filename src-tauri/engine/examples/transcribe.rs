@@ -15,7 +15,7 @@ fn main() -> anyhow::Result<()> {
     let asr = asr::Asr::load(&asr::ModelPaths::new(&paths::models_dir(), &model), "")?;
     eprintln!("loaded whisper-{model} in {:.1}s", t0.elapsed().as_secs_f32());
 
-    let samples = audio::load_wav_16k(&wav)?;
+    let samples = audio::load_audio_16k(&wav)?;
     let secs = samples.len() as f32 / itsmypa_engine::SAMPLE_RATE as f32;
 
     let t1 = Instant::now();

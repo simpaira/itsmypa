@@ -1237,10 +1237,12 @@ async function startRecording(){
   }
 }
 
-/* Desktop path: the native helper records the mic — no webview capture, no
-   macOS voice processing, so the rest of the system stays audible. The WAV
-   lives on the server's disk from the first buffer (inherent crash safety). */
+/* Desktop path: the engine records the mic and the computer audio natively,
+   together on one clock — no webview capture, no macOS voice processing, so
+   the rest of the system stays audible. The WAVs are on disk from the first
+   second (crash safety). */
 let micCaptureId=null, micLevelInterval=null, micLevelIdx=0, nativeRecording=false;
+let recordingId=null, sysLive=false;
 
 // What to capture: 'both' (mic + computer audio), 'mic' (microphone only),
 // 'system' (computer audio only — e.g. a video playing, no mic).
@@ -1257,25 +1259,25 @@ function setRecSource(s){
 
 async function startRecordingNative(){
   try{
-    micCaptureId=null; nativeRecording=true;
+    nativeRecording=true; recordingId=null; sysLive=false;
     resetSysCapture();
-    if(recSource!=='system'){
-      const r=await fetch('/mic/start',{method:'POST'});
-      if(!r.ok){
-        const e=await r.json().catch(()=>({}));
-        throw new Error(e.detail||'Could not start the microphone.');
-      }
-      micCaptureId=(await r.json()).capture_id;
-      // Live waveform from the helper's RMS level lines.
-      micLevelIdx=0;
-      micLevelInterval=setInterval(async ()=>{
-        if(!micCaptureId) return;
-        try{
-          const d=await fetch(`/mic/level/${micCaptureId}`).then(x=>x.json());
-          waveData[micLevelIdx++%waveData.length]=d.level;
-        }catch(e){}
-      },120);
-    }
+    // Opening the audio devices takes a second or two (longer the first time,
+    // while macOS asks for permission) — the timer starts once capture is live.
+    setRecHint('Starting…');
+    const r=await fetch('/recording/start',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mic: recSource!=='system', system: recSource!=='mic'})});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.detail||'Could not start recording.');
+    sysLive = d.tracks.some(t=>t.kind==='system' && t.live);
+    if(!d.live) showToast('Recording — an audio device is still connecting.','');
+    // Live waveform from the engine's level meter (mic or computer audio).
+    micLevelIdx=0;
+    micLevelInterval=setInterval(async ()=>{
+      try{
+        const l=await fetch('/recording/level').then(x=>x.json());
+        waveData[micLevelIdx++%waveData.length]=Math.max(l.mic||0, l.system||0);
+      }catch(e){}
+    },120);
     beginRecordingUI();
   } catch(e){ nativeRecording=false; showToast(e.message,'error'); setRecHint(e.message); }
 }
@@ -1296,7 +1298,10 @@ function beginRecordingUI(){
   document.getElementById('scratchpad')?.focus();
   growPad();
   setStatus('Recording…','working');
-  if(recSource!=='mic') startSystemCapture();   // computer-audio channel
+  if(sysLive){
+    renderSysChip('on');
+    setStatus(recSource==='system' ? 'Recording computer audio…' : 'Recording you + computer audio…','working');
+  }
 }
 
 /* ── Computer-audio channel (native system-audio tap) ──
@@ -1312,30 +1317,6 @@ function renderSysChip(state){
   if(state==='on'){
     el.innerHTML=`<span class="syschip on">${icon('globe')} Computer audio on</span>`;
   } else el.innerHTML='';
-}
-
-// The desktop app taps system audio directly (ScreenCaptureKit) — no tab dialog,
-// hears every app. If Screen Recording permission is missing we quietly stay
-// mic-only and hint once, rather than blocking the recording.
-let sysPermissionHinted=false;
-async function startSystemCapture(){
-  if(!nativeCaptureAvailable || sysCaptureId) return;
-  try{
-    const off=elapsed;
-    const r=await fetch('/system_audio/start',{method:'POST'});
-    if(!r.ok){
-      if(r.status===403 && !sysPermissionHinted){
-        sysPermissionHinted=true;
-        showToast('Recording your mic. Enable computer audio in Settings to also capture video-call audio.','');
-      }
-      return;   // mic-only, no drama
-    }
-    const d=await r.json();
-    sysCaptureId=d.capture_id;
-    sysOffsetSec=off;
-    renderSysChip('on');
-    setStatus('Recording you + computer audio…','working');
-  }catch(e){ /* stay mic-only */ }
 }
 
 /* ── Crash-safe chunk backups ── */
@@ -1365,12 +1346,6 @@ async function stopRecording(){
   if(backupInterval){ clearInterval(backupInterval); backupInterval=null; }
   if(micLevelInterval){ clearInterval(micLevelInterval); micLevelInterval=null; waveData.fill(0); }
   isRecording=false; isPaused=false;
-  if(sysCaptureId){
-    // Stop the native helper and wait for its WAV to finalize before uploading.
-    const id=sysCaptureId;
-    sysStopPromise=fetch('/system_audio/stop',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({capture_id:id})}).catch(()=>{});
-  }
   renderSysChip('');
   const btnRec = document.getElementById('btn-rec');
   if(btnRec){ btnRec.innerHTML = icon('mic'); btnRec.classList.remove('live'); }
@@ -1379,13 +1354,14 @@ async function stopRecording(){
   updateRecPill();   // recording ended — hide the floating pill
 
   if(nativeRecording){
-    // Native path: finalize the helper WAV(s), then hand their ids to
-    // /transcribe. Works for mic, computer-audio-only, or both.
-    if(micCaptureId){
-      await fetch('/mic/stop',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({capture_id:micCaptureId})}).catch(()=>{});
-    }
-    if(sysStopPromise) await sysStopPromise;
+    // Native path: the engine finalizes both WAVs, then /transcribe takes the
+    // recording id. Works for mic, computer-audio-only, or both.
+    try{
+      const r=await fetch('/recording/stop',{method:'POST'});
+      const d=await r.json();
+      if(!r.ok) throw new Error(d.detail||'Could not stop the recording.');
+      recordingId=d.recording_id;
+    }catch(e){ showToast(e.message,'error'); }
     nativeRecording=false;
     processAudio(null);
   } else {
@@ -1398,11 +1374,11 @@ function togglePause(){
   if(!isRecording) return;
   const btn = document.getElementById('btn-pause');
   if(isPaused){
-    if(micCaptureId) fetch('/mic/resume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({capture_id:micCaptureId})}).catch(()=>{});
+    if(nativeRecording) fetch('/recording/resume',{method:'POST'}).catch(()=>{});
     else if(mediaRec) mediaRec.resume(); else return;
     isPaused=false; startTime=Date.now()-elapsed*1000; timerInterval=setInterval(updateTimer,500); btn.innerHTML=icon('pause'); setStatus('Recording…','working');
   } else {
-    if(micCaptureId) fetch('/mic/pause',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({capture_id:micCaptureId})}).catch(()=>{});
+    if(nativeRecording) fetch('/recording/pause',{method:'POST'}).catch(()=>{});
     else if(mediaRec) mediaRec.pause(); else return;
     isPaused=true; clearInterval(timerInterval); btn.innerHTML=icon('play'); setStatus('Paused','');
   }
@@ -1477,9 +1453,8 @@ async function processAudio(blob){
 // the user is looking at a different meeting while it runs.
 async function processMeeting(noteId, blob, template, scratch){
   const fd=new FormData();
-  if(micCaptureId){ fd.append('mic_capture_id',micCaptureId); micCaptureId=null; }
-  else if(blob) fd.append('audio',blob,'audio.webm');
-  if(sysCaptureId){ fd.append('system_capture_id',sysCaptureId); fd.append('system_offset',String(sysOffsetSec)); }
+  if(recordingId){ fd.append('recording_id',recordingId); recordingId=null; }
+  else if(blob) fd.append('audio',blob,blob.name||'audio.webm');
   resetSysCapture();
   try{
     const r=await fetch('/transcribe',{method:'POST',body:fd});

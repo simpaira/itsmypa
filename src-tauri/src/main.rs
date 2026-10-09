@@ -3,6 +3,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod api;
+mod jobs;
+mod recording;
 mod state;
 
 use serde_json::Value;
@@ -19,6 +21,35 @@ async fn api(state: tauri::State<'_, Arc<AppState>>, method: String, path: Strin
     tauri::async_runtime::spawn_blocking(move || api::handle(&state, &method, &path, body))
         .await
         .map_err(|e| api::ApiError::new(500, e.to_string()))?
+}
+
+/// An audio file the user picked to transcribe, sent as raw bytes (too big
+/// to pass as JSON). Saved into the recordings folder; returns its id for
+/// `/transcribe`.
+#[tauri::command]
+fn upload(request: tauri::ipc::Request<'_>) -> Result<String, api::ApiError> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err(api::ApiError::new(400, "Expected the file's bytes"));
+    };
+    let name = request.headers().get("x-file-name").and_then(|v| v.to_str().ok()).unwrap_or("audio");
+    // Keep only a safe extension; it tells the decoder the format.
+    let ext: String = std::path::Path::new(name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .filter(|e| e.len() <= 5 && e.chars().all(|c| c.is_ascii_alphanumeric()))
+        .unwrap_or("bin")
+        .to_lowercase();
+    let id = format!("upload-{}.{ext}", uuid::Uuid::new_v4());
+    let dir = itsmypa_engine::paths::recordings_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| api::ApiError::new(500, e.to_string()))?;
+    std::fs::write(dir.join(&id), bytes).map_err(|e| api::ApiError::new(500, format!("Could not save the file: {e}")))?;
+    Ok(id)
+}
+
+/// Path of an uploaded file from its id — only ids `upload` could have made.
+pub fn upload_path(id: &str) -> Option<std::path::PathBuf> {
+    let ok = id.starts_with("upload-") && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.') && !id.contains("..");
+    ok.then(|| itsmypa_engine::paths::recordings_dir().join(id))
 }
 
 /// Development aid: with ITSMYPA_DEBUG_REPORT=<file>, the page writes its
@@ -38,7 +69,7 @@ fn main() {
 
     tauri::Builder::default()
         .manage(Arc::new(state))
-        .invoke_handler(tauri::generate_handler![api, debug_report])
+        .invoke_handler(tauri::generate_handler![api, upload, debug_report])
         .setup(|app| {
             if std::env::var_os("ITSMYPA_DEBUG_REPORT").is_some() {
                 let win = app.get_webview_window("main").expect("main window");
@@ -57,6 +88,13 @@ fn main() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running ItsMyPA");
+        .build(tauri::generate_context!())
+        .expect("error while building ItsMyPA")
+        .run(|app, event| {
+            // Finish any running capture so its audio is complete on disk and
+            // the audio devices are released cleanly.
+            if let tauri::RunEvent::Exit = event {
+                app.state::<Arc<AppState>>().recorder.stop_on_exit();
+            }
+        });
 }

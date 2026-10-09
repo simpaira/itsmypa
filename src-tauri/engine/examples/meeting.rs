@@ -22,11 +22,11 @@ fn main() -> anyhow::Result<()> {
         Some(system) => pipeline::transcribe_dual(
             &asr,
             Some(&diarizer),
-            &audio::load_wav_16k(first)?,
-            &audio::load_wav_16k(system)?,
+            &audio::load_audio_16k(first)?,
+            &audio::load_audio_16k(system)?,
             &mut progress,
         )?,
-        None => pipeline::transcribe_single(&asr, Some(&diarizer), &audio::load_wav_16k(first)?, &mut progress)?,
+        None => pipeline::transcribe_single(&asr, Some(&diarizer), &audio::load_audio_16k(first)?, &mut progress)?,
     };
     eprintln!("\rdone in {:.1}s            ", t0.elapsed().as_secs_f32());
     println!("{}", transcript.text);
