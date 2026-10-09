@@ -41,11 +41,36 @@
   const jsonResponse = (data, status = 200) =>
     new Response(JSON.stringify(data ?? null), { status, headers: { 'Content-Type': 'application/json' } });
 
+  // AI answers stream in as they're written (summary, chat, …).
+  const STREAMING = new Set(['/summarize', '/enhance', '/generate/email', '/chat', '/ask']);
+
+  // Resolves with a streaming Response once the first piece arrives (or the
+  // answer ends) — so a bad request still comes back as a proper error status.
+  function streamResponse(path, body) {
+    return new Promise(resolve => {
+      const enc = new TextEncoder();
+      let controller, started = false;
+      const stream = new ReadableStream({ start(c) { controller = c; } });
+      const begin = () => { if (!started) { started = true; resolve(new Response(stream, { status: 200 })); } };
+      const onPiece = new window.__TAURI__.core.Channel();
+      onPiece.onmessage = piece => { begin(); controller.enqueue(enc.encode(piece)); };
+      invoke('api_stream', { path, body, onPiece }).then(
+        () => { begin(); controller.close(); },
+        err => {
+          if (started) { controller.close(); return; }
+          started = true;
+          const e = err && typeof err === 'object' ? err : { status: 500, detail: String(err) };
+          resolve(jsonResponse({ detail: e.detail || 'Something went wrong' }, e.status || 500));
+        });
+    });
+  }
+
   window.fetch = async (input, init = {}) => {
     const url = typeof input === 'string' ? input : input.url;
     if (!url.startsWith('/')) return realFetch(input, init);
     const path = url.split('?')[0];
     const method = (init.method || 'GET').toUpperCase();
+    if (method === 'POST' && STREAMING.has(path)) return streamResponse(path, await toJson(init.body));
     try {
       const data = await invoke('api', { method, path, body: await toJson(init.body) });
       return jsonResponse(data);

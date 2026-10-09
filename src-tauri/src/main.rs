@@ -2,6 +2,7 @@
 // in one process. No Python, no local web server.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod ai;
 mod api;
 mod jobs;
 mod recording;
@@ -21,6 +22,24 @@ async fn api(state: tauri::State<'_, Arc<AppState>>, method: String, path: Strin
     tauri::async_runtime::spawn_blocking(move || api::handle(&state, &method, &path, body))
         .await
         .map_err(|e| api::ApiError::new(500, e.to_string()))?
+}
+
+/// The AI requests that stream their answer (see ai.rs). Each piece of text
+/// goes to the screen through `on_piece` as soon as it's written.
+#[tauri::command]
+async fn api_stream(
+    state: tauri::State<'_, Arc<AppState>>,
+    path: String,
+    body: Option<Value>,
+    on_piece: tauri::ipc::Channel<String>,
+) -> Result<(), api::ApiError> {
+    let state = Arc::clone(&state);
+    tauri::async_runtime::spawn_blocking(move || {
+        // A failed send means the screen went away: stop generating.
+        ai::stream(&state, &path, body, &mut |piece| on_piece.send(piece.to_string()).is_ok())
+    })
+    .await
+    .map_err(|e| api::ApiError::new(500, e.to_string()))?
 }
 
 /// An audio file the user picked to transcribe, sent as raw bytes (too big
@@ -69,7 +88,7 @@ fn main() {
 
     tauri::Builder::default()
         .manage(Arc::new(state))
-        .invoke_handler(tauri::generate_handler![api, upload, debug_report])
+        .invoke_handler(tauri::generate_handler![api, api_stream, upload, debug_report])
         .setup(|app| {
             if std::env::var_os("ITSMYPA_DEBUG_REPORT").is_some() {
                 let win = app.get_webview_window("main").expect("main window");

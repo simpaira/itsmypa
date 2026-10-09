@@ -116,6 +116,7 @@ pub fn handle(state: &AppState, method: &str, path: &str, body: Option<Value>) -
 
         ("POST", ["transcribe"]) => transcribe(state, body),
         ("GET", ["jobs", id]) => state.jobs.status(id).ok_or_else(|| ApiError::new(404, "Job not found")),
+        ("POST", ["generate", "title"]) => crate::ai::title(state, body),
 
         // Wired in later groups (recovery, calendar, permissions); safe
         // placeholders so the home screen loads.
