@@ -4,6 +4,7 @@
 
 pub mod asr;
 pub mod audio;
+pub mod diarize;
 pub mod llm;
 pub mod paths;
 pub mod pipeline;

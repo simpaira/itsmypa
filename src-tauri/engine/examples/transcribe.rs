@@ -19,7 +19,7 @@ fn main() -> anyhow::Result<()> {
     let secs = samples.len() as f32 / itsmypa_engine::SAMPLE_RATE as f32;
 
     let t1 = Instant::now();
-    let text = pipeline::transcribe_plain(&asr, &samples, &mut |p| eprint!("\r{:3.0}%", p * 100.0))?;
+    let text = pipeline::transcribe_single(&asr, None, &samples, &mut |_, p| eprint!("\r{:3.0}%", p * 100.0))?.text;
     let took = t1.elapsed().as_secs_f32();
     eprintln!("\r{secs:.1}s of audio in {took:.1}s ({:.1}x realtime)", secs / took);
     println!("{text}");
