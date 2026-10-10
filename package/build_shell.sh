@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the full ItsMyPA desktop app: Python engine bundle → Tauri native shell
+# Build the ItsMyPA desktop app (screens + Rust engine in one binary)
 # → signed-later .app → drag-to-Applications .dmg.
 #
 #   ./package/build_shell.sh
@@ -11,11 +11,8 @@ set -e
 cd "$(dirname "$0")/.."
 source "$HOME/.cargo/env" 2>/dev/null || true
 
-echo "── 1/3  Building the Python engine bundle ──"
-./package/build_server.sh
-
-echo "── 2/3  Building the Tauri native shell ──"
-cargo tauri build
+echo "── 1/2  Building the app ──"
+cargo tauri build --bundles app
 
 APP="src-tauri/target/release/bundle/macos/ItsMyPA.app"
 [ -d "$APP" ] || { echo "❌ $APP not found"; exit 1; }
@@ -27,7 +24,7 @@ APP="src-tauri/target/release/bundle/macos/ItsMyPA.app"
 # persistence across builds still needs a Developer ID certificate.)
 codesign --force --sign - --identifier com.itsmypa.desktop "$APP"
 
-echo "── 3/3  Wrapping the DMG ──"
+echo "── 2/2  Wrapping the DMG ──"
 mkdir -p dist
 STAGE=$(mktemp -d)
 cp -R "$APP" "$STAGE/"

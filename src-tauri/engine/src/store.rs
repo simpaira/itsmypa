@@ -190,9 +190,8 @@ impl Store {
     pub fn create(&self, mut note: Note) -> Result<Note> {
         note.id = uuid::Uuid::new_v4().to_string();
         note.date = now_iso();
-        if note.title.trim().is_empty() {
-            note.title = "Untitled Meeting".into();
-        }
+        // An empty title is kept empty: the screen fills it in with an AI
+        // title once the transcript is ready (and shows "Untitled" until then).
         if note.status.is_empty() {
             note.status = "ready".into();
         }
@@ -384,6 +383,13 @@ mod tests {
 
         assert!(s.delete(&n.id).unwrap());
         assert!(s.list().unwrap().is_empty());
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn empty_title_stays_empty_for_the_ai_title() {
+        let (s, dir) = temp_store("title");
+        assert_eq!(s.create(note("", "")).unwrap().title, "");
         std::fs::remove_dir_all(dir).ok();
     }
 

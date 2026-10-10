@@ -800,8 +800,7 @@ function showToast(msg, type='default'){
 }
 
 /* ───────────────────────── State ───────────────────────── */
-let mediaRec=null, audioCtx=null, analyser=null, animFrame=null;
-let chunks=[], isRecording=false, isPaused=false;
+let animFrame=null, isRecording=false, isPaused=false;
 let startTime=0, elapsed=0, timerInterval=null;
 let curTranscript='', curSummary='', curSegments=null, curActionStatus={}, curNoteId=null;
 let curTemplate='general';
@@ -810,28 +809,11 @@ let pendingMeetingTitle='';
 let recScratchpadSnap='';   // preserves the recording's notes while viewing another meeting
 let notes=[], diarizeEnabled=false, nativeCaptureAvailable=false;
 
-// Raw mic constraints: echoCancellation/noiseSuppression/autoGainControl turn
-// on macOS voice processing, which mutes ALL other system audio while the mic
-// is open. A meeting recorder must leave playback audible.
-const MIC_RAW={echoCancellation:false,noiseSuppression:false,autoGainControl:false};
-
-// The mic is captured NATIVELY by the engine — WKWebView's getUserMedia
-// engages voice processing regardless of constraints, muting system audio.
-const IS_DESKTOP = true;   // always the desktop app now (no browser mode)
-
 async function micGranted(){
-  if(IS_DESKTOP){
-    try{
-      const d=await fetch('/mic/status').then(r=>r.json());
-      if(d.available) return d.state==='granted';
-    }catch(e){}
-  }
-  // Browser: trust the Permissions API when it answers; when it can't, assume
-  // granted rather than nagging with the permissions pane on every load.
   try{
-    const s=await navigator.permissions.query({name:'microphone'});
-    return s.state!=='denied' && s.state!=='prompt';
-  }catch(e){ return true; }
+    const d=await fetch('/mic/status').then(r=>r.json());
+    return d.state==='granted';
+  }catch(e){ return true; }   // can't tell: don't nag with the permissions pane
 }
 
 // Computer-audio permission as the engine knows it (it can only learn it by
@@ -1056,7 +1038,7 @@ function showRecorder(){
 }
 
 /* Rebuild the live recording view after the user navigated away to a saved note.
-   The recorder itself (mic stream, chunks, timer) never stopped — only the DOM
+   The recorder itself (the engine's capture, the timer) never stopped — only the DOM
    was replaced — so this just re-renders and re-applies the recording state. */
 function returnToRecording(){
   // If we're re-rendering over the live recording view, capture its current
@@ -1079,7 +1061,7 @@ function returnToRecording(){
   document.getElementById('view-title').textContent = isPaused?'Paused':'Recording…';
   document.getElementById('session-area').innerHTML = recordingSessionHTML();
   growPad();
-  if(sysCaptureId) renderSysChip('on');
+  if(sysLive) renderSysChip('on');
   startWaveform();
   const sc=document.querySelector('.content'); if(sc) sc.scrollTop=0;
   closeSidebar();
@@ -1167,7 +1149,6 @@ function startWaveform(){
     const w=canvas.width,h=canvas.height,barW=3,gap=2,n=Math.floor(w/(barW+gap));
     ctx2.clearRect(0,0,w,h);
     for(let i=0;i<n;i++){
-      if(analyser){const a=new Uint8Array(analyser.frequencyBinCount);analyser.getByteFrequencyData(a);waveData[i%waveData.length]=a[Math.floor(i*a.length/n)]/255;}
       const amp=waveData[i%waveData.length]*(h*.8)||(Math.sin(i*.4+Date.now()*.001)*3+4);
       ctx2.fillStyle=isRecording&&!isPaused?'#C2502F':'#D7D3C6';
       ctx2.beginPath();ctx2.roundRect(i*(barW+gap),(h-amp)/2,barW,Math.max(amp,3),2);ctx2.fill();
@@ -1182,67 +1163,14 @@ async function toggleRecord(){ isRecording ? await stopRecording() : await start
 
 async function startRecording(){
   if(!modelsReady){ showToast('Still finishing first-time setup — please wait a moment.','error'); return; }
-  if(IS_DESKTOP){
-    // The desktop app must NEVER fall back to webview getUserMedia: WKWebView
-    // engages macOS voice processing, which mutes all other system audio for
-    // as long as the mic is open. If the native flag isn't set yet (a record
-    // click can race the first /health answer), re-check once — then either
-    // record natively or refuse with an error, but never open the webview mic.
-    if(!nativeCaptureAvailable){
-      try{
-        const d=await fetch('/health').then(r=>r.json());
-        nativeCaptureAvailable=!!d.system_audio;
-      }catch(e){}
-    }
-    if(!nativeCaptureAvailable){
-      const msg='Recording engine not ready — the native audio helper is unavailable. Try again in a moment, or reinstall if this persists.';
-      showToast(msg,'error'); setRecHint(msg);
-      return;
-    }
-    return startRecordingNative();
-  }
-  let stream;
-  try{
-    // One button, like it should be: the mic starts instantly. Computer audio
-    // (for headphone video calls) is added with one click while recording.
-    // MIC_RAW keeps macOS voice processing off so system audio stays audible.
-    try{ stream=await navigator.mediaDevices.getUserMedia({audio:MIC_RAW,video:false}); }
-    catch(e){ throw new Error('Microphone unavailable — check browser permissions for this site.'); }
-    audioCtx=new AudioContext(); analyser=audioCtx.createAnalyser(); analyser.fftSize=256;
-    audioCtx.createMediaStreamSource(stream).connect(analyser);
-
-    resetSysCapture();
-    const mimeType=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg','audio/mp4']
-      .find(t=>MediaRecorder.isTypeSupported(t))||'';
-    mediaRec=new MediaRecorder(stream,mimeType?{mimeType}:{});
-    chunks=[];
-    mediaRec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
-    mediaRec.onstop=async ()=>{
-      stream.getTracks().forEach(t=>t.stop());
-      if(sysStopPromise) await sysStopPromise;   // wait for the system recorder to flush
-      processAudio(new Blob(chunks,{type:mimeType||'audio/webm'}));
-    };
-    stream.getAudioTracks()[0]?.addEventListener('ended',()=>{if(isRecording)stopRecording();});
-    mediaRec.start(500);
-
-    // Crash safety: stream chunks to the server every few seconds, so a tab
-    // crash or accidental refresh mid-recording can be recovered.
-    recSessionId = crypto.randomUUID();
-    backupIdx = 0; backupBusy = false;
-    backupInterval = setInterval(backupChunks, 8000);
-
-    beginRecordingUI();
-  } catch(e){
-    releaseStream(stream);   // a leaked live mic would keep system audio muted
-    showToast(e.message,'error'); setRecHint(e.message);
-  }
+  return startRecordingNative();
 }
 
 /* Desktop path: the engine records the mic and the computer audio natively,
    together on one clock — no webview capture, no macOS voice processing, so
    the rest of the system stays audible. The WAVs are on disk from the first
    second (crash safety). */
-let micCaptureId=null, micLevelInterval=null, micLevelIdx=0, nativeRecording=false;
+let micLevelInterval=null, micLevelIdx=0, nativeRecording=false;
 let recordingId=null, sysLive=false;
 
 // What to capture: 'both' (mic + computer audio), 'mic' (microphone only),
@@ -1261,7 +1189,6 @@ function setRecSource(s){
 async function startRecordingNative(){
   try{
     nativeRecording=true; recordingId=null; sysLive=false;
-    resetSysCapture();
     // Opening the audio devices takes a second or two (longer the first time,
     // while macOS asks for permission) — the timer starts once capture is live.
     setRecHint('Starting…');
@@ -1309,9 +1236,6 @@ function beginRecordingUI(){
    Captured automatically on every recording. The mic is "You"; the computer
    audio is everyone else. If the meeting turns out to be in-person (nothing
    played through the computer), the engine falls back to normal diarization. */
-let sysOffsetSec=0, sysStopPromise=null, sysCaptureId=null;
-
-function resetSysCapture(){ sysOffsetSec=0; sysStopPromise=null; sysCaptureId=null; }
 
 function renderSysChip(state){
   const el=document.getElementById('rec-extra'); if(!el) return;
@@ -1320,31 +1244,8 @@ function renderSysChip(state){
   } else el.innerHTML='';
 }
 
-/* ── Crash-safe chunk backups ── */
-let recSessionId=null, backupIdx=0, backupBusy=false, backupInterval=null;
-
-async function backupChunks(){
-  if(backupBusy || !recSessionId || chunks.length<=backupIdx) return;
-  backupBusy=true;
-  try{
-    const end=chunks.length;
-    const fd=new FormData();
-    fd.append('audio', new Blob(chunks.slice(backupIdx,end), {type:mediaRec.mimeType}), 'chunk.webm');
-    const r=await fetch(`/recordings/${recSessionId}/chunk`, {method:'POST', body:fd});
-    if(r.ok) backupIdx=end;
-  }catch(e){}
-  finally{ backupBusy=false; }
-}
-
-function finishBackup(){
-  if(!recSessionId) return;
-  fetch(`/recordings/${recSessionId}/finish`,{method:'POST'}).catch(()=>{});
-  recSessionId=null;
-}
-
 async function stopRecording(){
   clearInterval(timerInterval);
-  if(backupInterval){ clearInterval(backupInterval); backupInterval=null; }
   if(micLevelInterval){ clearInterval(micLevelInterval); micLevelInterval=null; waveData.fill(0); }
   isRecording=false; isPaused=false;
   renderSysChip('');
@@ -1354,33 +1255,26 @@ async function stopRecording(){
   document.getElementById('timer')?.classList.remove('recording');
   updateRecPill();   // recording ended — hide the floating pill
 
-  if(nativeRecording){
-    // Native path: the engine finalizes both WAVs, then /transcribe takes the
-    // recording id. Works for mic, computer-audio-only, or both.
-    try{
-      const r=await fetch('/recording/stop',{method:'POST'});
-      const d=await r.json();
-      if(!r.ok) throw new Error(d.detail||'Could not stop the recording.');
-      recordingId=d.recording_id;
-    }catch(e){ showToast(e.message,'error'); }
-    nativeRecording=false;
-    processAudio(null);
-  } else {
-    mediaRec?.stop(); mediaRec?.stream?.getTracks().forEach(t=>t.stop());
-    audioCtx?.close(); audioCtx=null; analyser=null;
-  }
+  // The engine finalizes the WAVs, then /transcribe takes the recording id.
+  // Works for mic, computer-audio-only, or both.
+  try{
+    const r=await fetch('/recording/stop',{method:'POST'});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.detail||'Could not stop the recording.');
+    recordingId=d.recording_id;
+  }catch(e){ showToast(e.message,'error'); }
+  nativeRecording=false;
+  processAudio(null);
 }
 
 function togglePause(){
-  if(!isRecording) return;
+  if(!isRecording || !nativeRecording) return;
   const btn = document.getElementById('btn-pause');
   if(isPaused){
-    if(nativeRecording) fetch('/recording/resume',{method:'POST'}).catch(()=>{});
-    else if(mediaRec) mediaRec.resume(); else return;
+    fetch('/recording/resume',{method:'POST'}).catch(()=>{});
     isPaused=false; startTime=Date.now()-elapsed*1000; timerInterval=setInterval(updateTimer,500); btn.innerHTML=icon('pause'); setStatus('Recording…','working');
   } else {
-    if(nativeRecording) fetch('/recording/pause',{method:'POST'}).catch(()=>{});
-    else if(mediaRec) mediaRec.pause(); else return;
+    fetch('/recording/pause',{method:'POST'}).catch(()=>{});
     isPaused=true; clearInterval(timerInterval); btn.innerHTML=icon('play'); setStatus('Paused','');
   }
 }
@@ -1432,7 +1326,6 @@ async function processAudio(blob){
   const template = curTemplate;
   const title = pendingMeetingTitle || '';
   const dur = Math.round(elapsed) || 0;
-  finishBackup();
 
   // Create the meeting immediately so it's saved and shown in the sidebar with
   // a live status — navigating to another meeting can never lose it.
@@ -1455,8 +1348,7 @@ async function processAudio(blob){
 async function processMeeting(noteId, blob, template, scratch){
   const fd=new FormData();
   if(recordingId){ fd.append('recording_id',recordingId); recordingId=null; }
-  else if(blob) fd.append('audio',blob,blob.name||'audio.webm');
-  resetSysCapture();
+  else if(blob) fd.append('audio',blob,blob.name||'audio');
   try{
     const r=await fetch('/transcribe',{method:'POST',body:fd});
     if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(e.detail||'Transcription failed'); }
@@ -2119,10 +2011,8 @@ async function doImport(ev){
 async function maybeOnboard(){
   if(localStorage.getItem('ms_onboarded')){
     // A fresh install of an unsigned build is a "new app" to macOS: the mic /
-    // screen-recording grants are gone while localStorage survives. Re-open the
+    // computer-audio grants are gone while localStorage survives. Re-open the
     // permissions pane at launch instead of surprising the user mid-recording.
-    // Desktop-only: browsers manage their own mic permission UI.
-    if(!IS_DESKTOP) return;
     const micOk=await micGranted();
     const sysOk=await sysGranted();
     // Don't nag about computer audio if the user chose to skip it before.
@@ -2182,22 +2072,8 @@ function togglePerm(which){
 }
 
 async function refreshMicStatus(){
-  if(IS_DESKTOP){
-    try{
-      const d=await fetch('/mic/status').then(r=>r.json());
-      if(d.available && d.state==='granted') markPermGranted('mic');
-      return;
-    }catch(e){}
-  }
-  try{
-    const s=await navigator.permissions?.query({name:'microphone'});
-    if(s && s.state==='granted') markPermGranted('mic');
-  }catch(e){}
+  if(await micGranted()) markPermGranted('mic');
 }
-
-// If recording setup dies after the mic opened, release it — a leaked live mic
-// keeps macOS voice processing (and its system-audio mute) engaged.
-function releaseStream(s){ try{ s?.getTracks().forEach(t=>t.stop()); }catch(e){} }
 
 async function grantMic(){
   const note=document.getElementById('perm-note');
