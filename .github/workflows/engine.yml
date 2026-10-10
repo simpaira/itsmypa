@@ -1,0 +1,34 @@
+name: engine
+
+# Builds and unit-tests the Rust engine and capture crates on every supported
+# desktop OS. This is the gate for the Python → Rust migration: sherpa-onnx
+# (prebuilt static libs) + llama.cpp must compile and link together on macOS
+# and Windows, and the capture crate must build against WASAPI.
+on:
+  push:
+    branches: [main, rust-engine]
+    paths: ["src-tauri/**", ".github/workflows/engine.yml"]
+  pull_request:
+    paths: ["src-tauri/**", ".github/workflows/engine.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Build engine + capture + examples
+        run: cargo build --release -p itsmypa-engine -p itsmypa-capture --examples
+      - name: Unit tests
+        run: cargo test --release -p itsmypa-engine -p itsmypa-capture

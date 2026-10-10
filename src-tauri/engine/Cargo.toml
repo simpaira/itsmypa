@@ -1,0 +1,30 @@
+[package]
+name = "itsmypa-engine"
+version = "0.2.0"
+description = "ItsMyPA on-device engine: capture, transcription, diarization, local LLM"
+edition = "2021"
+
+[dependencies]
+sherpa-onnx = "1.13.8"
+hound = "3.5"
+dirs = "6"
+anyhow = "1"
+ureq = "2.12"
+sha2 = "0.10"
+regex = "1"
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+uuid = { version = "1", features = ["v4"] }
+tar = "0.4"
+bzip2 = "0.5"
+rrule = "0.14"
+chrono-tz = "0.10"
+symphonia = { version = "0.5", features = ["mp3", "aac", "isomp4", "alac"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+llama-cpp-2 = { version = "0.1.158", default-features = false, features = ["metal"] }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+llama-cpp-2 = { version = "0.1.158", default-features = false }

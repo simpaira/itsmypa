@@ -56,11 +56,11 @@ ItsMyPA does everything those tools do, **on your own hardware**:
   record-prompts, full-text search.
 
 All of it powered by on-device models (Whisper, pyannote, TitaNet, a local LLM).
-The first launch downloads them (~5 GB, one time). After that: airplane mode works.
+The first launch downloads them (~2.6 GB, one time). After that: airplane mode works.
 
 ## Get it
 
-**Requirements:** Apple Silicon Mac (M1 or newer), macOS 13+, 16 GB RAM recommended.
+**Requirements:** Apple Silicon Mac (M1 or newer), macOS 14.6+, 16 GB RAM recommended.
 
 1. [Download the latest DMG](https://github.com/simpaira/itsmypa/releases/latest)
 2. Drag ItsMyPA to Applications
@@ -88,47 +88,44 @@ Like the project? A ⭐ on this repo is free and helps more people find it.
 
 ## How it works
 
-The speech stack runs on **sherpa-onnx** (ONNX Runtime): Whisper (int8) for
-transcription, Silero VAD for speech chunking, and pyannote segmentation-3.0 +
-NeMo TitaNet embeddings for speaker diarization. Summarization and chat use a
-local GGUF LLM via `llama-cpp-python`. The native shell is Tauri; system audio
-is captured through a ScreenCaptureKit helper (the same mechanism Granola uses).
+ItsMyPA is one small native app (Tauri + Rust, ~30 MB) — no Python, no local
+web server, nothing listening on the network.
 
-Long recordings run as **background jobs**: the pipeline runs VAD, diarizes,
-then decodes Whisper over ~28-second single-speaker windows. A failure partway
-keeps everything transcribed so far; a browser timeout or laptop nap can't kill
-a 90-minute job. While recording, audio chunks stream to disk every few seconds,
-so a crash mid-meeting is recoverable.
+- **Capture** (`src-tauri/capture`): your microphone and the computer's audio,
+  recorded together on one clock via cpal — Core Audio process taps on macOS
+  14.6+ and WASAPI loopback on Windows. Pausing pauses both; switching
+  headphones mid-meeting reconnects; WAVs are crash-safe on disk.
+- **Speech** (`src-tauri/engine`): **sherpa-onnx** runs Whisper (int8),
+  Silero VAD and pyannote segmentation-3.0 + NeMo TitaNet speaker embeddings.
+  Your mic is labelled "You"; the computer audio is diarized into Speaker 2, 3…
+- **Notes**: a local GGUF model via **llama.cpp** (Metal on Apple Silicon)
+  writes the summary, chat answers, follow-up email and "enhance my notes".
+  Qwen2.5 3B by default; Gemma 4 E4B is available for better notes.
+- **Storage**: meetings live in one SQLite file with full-text search.
 
-The server binds to **127.0.0.1 only** by default.
+Long recordings are transcribed as background jobs; if ItsMyPA quits mid-
+meeting, the next launch offers to recover the recording.
 
 ## Run from source
 
+Needs Rust, the Tauri CLI (`cargo install tauri-cli`) and CMake.
+
 ```bash
-./run.sh          # creates venv, installs deps, downloads models (~200 MB)
+cd src-tauri
+cargo tauri dev                                   # run the app
+cargo test -p itsmypa-engine -p itsmypa-capture   # tests
 ```
 
-Then open **http://localhost:8765**. No Hugging Face token or account needed.
-
-Tunables (via `.env` or environment): `WHISPER_MODEL` (tiny/base/small/medium/
-large-v3, default `small`), `WHISPER_LANGUAGE` (default auto; non-Latin-script
-languages transcribe noticeably better on `medium`+), `DIARIZE`, `NUM_SPEAKERS`,
-`DIARIZE_THRESHOLD` (default 0.8), `CHAT_CONTEXT_WORDS`. The Settings UI (gear
-icon) controls the common ones and persists them to `.env`.
-
-Tests: `ITSMYPA_SKIP_MODELS=1 .venv/bin/python -m pytest tests/ -q`
+Models download on first launch into the app-data folder (macOS:
+`~/Library/Application Support/ItsMyPA`, Windows: `%LOCALAPPDATA%\ItsMyPA`) and
+are verified by checksum. Settings (Whisper size, language, speaker detection,
+notes model, calendar) are in the app's Settings screen.
 
 ## Build the desktop app
 
 ```bash
-pip install -r requirements-dev.txt
 ./package/build_shell.sh          # → dist/ItsMyPA.dmg
 ```
-
-The bundle is self-contained — engine, native audio-capture helper, and a static
-ffmpeg are all included; a fresh machine needs nothing installed. Speech models
-download to the app-data dir on first run (macOS:
-`~/Library/Application Support/ItsMyPA`).
 
 ## Support the project
 
