@@ -100,6 +100,11 @@ impl Recorder {
         Ok(Finished { id: a.id, mic: done.mic, system: done.system, duration_secs: done.duration_secs })
     }
 
+    /// The live recording's id, if one is running.
+    pub fn active_id(&self) -> Option<String> {
+        self.active.lock().unwrap().as_ref().map(|a| a.id.clone())
+    }
+
     /// Finalize any capture still running when the app quits, so its WAVs
     /// are complete and the audio devices are released cleanly.
     pub fn stop_on_exit(&self) {

@@ -118,11 +118,36 @@ pub fn handle(state: &AppState, method: &str, path: &str, body: Option<Value>) -
         ("GET", ["jobs", id]) => state.jobs.status(id).ok_or_else(|| ApiError::new(404, "Job not found")),
         ("POST", ["generate", "title"]) => crate::ai::title(state, body),
 
-        // Wired in later groups (recovery, calendar, permissions); safe
-        // placeholders so the home screen loads.
-        ("GET", ["recordings"]) => Ok(json!([])),
-        ("GET", ["calendar", "upcoming"]) => Ok(json!({"configured": false, "events": [], "error": null})),
-        ("GET", ["mic", "status"]) | ("GET", ["system_audio", "status"]) => Ok(json!({"available": true, "state": "granted"})),
+        ("GET", ["recordings"]) => {
+            let active = state.recorder.active_id();
+            let finished: Vec<String> = state.finished.lock().unwrap().keys().cloned().collect();
+            let busy = |p: &std::path::Path| {
+                let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                let mine = |id: &String| name.starts_with(&format!("{id}."));
+                active.as_ref().is_some_and(mine) || finished.iter().any(mine) || state.jobs.is_busy(p)
+            };
+            to_json(crate::recovery::list(&busy))
+        }
+        ("POST", ["recordings", id, "recover"]) => {
+            let input = crate::recovery::recover(id).map_err(|e| ApiError::new(404, e.to_string()))?;
+            Ok(json!({"job_id": state.jobs.enqueue(input)}))
+        }
+        ("DELETE", ["recordings", id]) => {
+            crate::recovery::discard(id).map_err(|e| ApiError::new(400, e.to_string()))?;
+            Ok(json!({"ok": true}))
+        }
+
+        ("GET", ["calendar", "upcoming"]) => Ok(state.calendar.upcoming(&state.settings().calendar_ics_url)),
+        ("GET", ["mic", "status"]) => Ok(json!({"available": true, "state": crate::permissions::mic_status()})),
+        ("POST", ["permissions", "mic"]) => Ok(json!({"granted": crate::permissions::request_mic()})),
+        ("GET", ["system_audio", "status"]) => Ok(json!({"available": true, "state": crate::permissions::system_status(&state.store)})),
+        ("POST", ["permissions", "system"]) => {
+            if state.recorder.active_id().is_some() {
+                return Err(ApiError::new(409, "Stop the recording first."));
+            }
+            crate::permissions::request_system(&state.store).map_err(|e| ApiError::new(403, e.to_string()))?;
+            Ok(json!({"granted": true}))
+        }
 
         _ => Err(ApiError::new(404, format!("{method} {path} is not available yet"))),
     }

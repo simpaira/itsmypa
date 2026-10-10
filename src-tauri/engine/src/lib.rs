@@ -5,6 +5,7 @@
 pub mod ask;
 pub mod asr;
 pub mod audio;
+pub mod calendar;
 pub mod chat;
 pub mod diarize;
 pub mod llm;

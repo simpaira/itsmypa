@@ -834,7 +834,8 @@ async function micGranted(){
   }catch(e){ return true; }
 }
 
-// Screen Recording state, silently (CGPreflight via the helper). null = can't tell.
+// Computer-audio permission as the engine knows it (it can only learn it by
+// asking once). null = can't tell.
 async function sysGranted(){
   try{
     const d=await fetch('/system_audio/status').then(r=>r.json());
@@ -1121,7 +1122,7 @@ async function checkOrphanRecordings(){
         ${icon('mic')}
         <div class="recover-info">
           <b>Unfinished recording found</b>
-          <span>${fmtDate(r.modified)} · ${(r.bytes/1e6).toFixed(1)} MB — probably from a closed or crashed tab</span>
+          <span>${fmtDate(r.modified)}${r.seconds?` · ${Math.max(1,Math.round(r.seconds/60))} min`:''} — ItsMyPA closed before it finished</span>
         </div>
         <button class="btn btn-primary btn-sm" onclick="recoverRecording('${r.id}')">Recover</button>
         <button class="btn btn-ghost btn-sm" onclick="discardRecording('${r.id}')">Discard</button>
@@ -2160,7 +2161,6 @@ function dismissOnboard(){
   const sysOn=document.getElementById('perm-sys-toggle').classList.contains('on');
   const sysRowShown=document.getElementById('perm-sys-toggle').closest('.perm-row').style.display!=='none';
   if(sysRowShown && !sysOn) localStorage.setItem('ms_sys_skipped','1');
-  stopSysPermWatch();
   document.getElementById('onboard-modal').classList.remove('open');
 }
 
@@ -2201,97 +2201,34 @@ function releaseStream(s){ try{ s?.getTracks().forEach(t=>t.stop()); }catch(e){}
 
 async function grantMic(){
   const note=document.getElementById('perm-note');
-  if(IS_DESKTOP){
-    // The native helper triggers the macOS mic prompt (attributed to the app),
-    // then we immediately stop the probe capture — we only wanted the grant.
-    note.style.color='var(--muted)'; note.textContent='Requesting…';
-    try{
-      const r=await fetch('/mic/start',{method:'POST'});
-      if(r.ok){
-        const d=await r.json();
-        fetch('/mic/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({capture_id:d.capture_id})});
-        markPermGranted('mic');
-        note.textContent='';
-      } else {
-        const e=await r.json().catch(()=>({}));
-        note.style.color='var(--amber)';
-        note.textContent=e.detail||'Microphone was blocked. Enable it in System Settings → Privacy & Security → Microphone, then reopen ItsMyPA.';
-      }
-    }catch(e){ note.style.color='var(--amber)'; note.textContent='Could not reach the recorder engine.'; }
-    return;
-  }
-  try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:MIC_RAW});
-    stream.getTracks().forEach(t=>t.stop());
-    markPermGranted('mic');
-    note.textContent='';
-  }catch(e){
-    note.textContent='Microphone was blocked. Enable it in System Settings → Privacy & Security → Microphone, then reopen ItsMyPA.';
-  }
-}
-
-async function grantSystemAudio(){
-  const note=document.getElementById('perm-note');
   note.style.color='var(--muted)'; note.textContent='Requesting…';
   try{
-    const r=await fetch('/system_audio/start',{method:'POST'});
+    // The engine asks macOS (the prompt only appears the first time).
+    const d=await fetch('/permissions/mic',{method:'POST'}).then(r=>r.json());
+    if(d.granted){ markPermGranted('mic'); note.textContent=''; return; }
+    note.style.color='var(--amber)';
+    note.textContent='Microphone was blocked. Enable it in System Settings → Privacy & Security → Microphone, then reopen ItsMyPA.';
+  }catch(e){ note.style.color='var(--amber)'; note.textContent='Could not reach the recorder engine.'; }
+}
+
+// Computer audio uses macOS "System Audio Recording" permission. There's no
+// way to check it silently — the engine runs a short test capture, which
+// shows the prompt the first time.
+async function grantSystemAudio(){
+  const note=document.getElementById('perm-note');
+  note.style.color='var(--muted)'; note.textContent='Requesting… (allow ItsMyPA if macOS asks)';
+  try{
+    const r=await fetch('/permissions/system',{method:'POST'});
     if(r.ok){
-      const d=await r.json();
-      // Immediately stop the probe capture — we only wanted the permission.
-      fetch('/system_audio/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({capture_id:d.capture_id})});
-      stopSysPermWatch();
       markPermGranted('sys');
       localStorage.removeItem('ms_sys_skipped');
-      note.style.color='var(--muted)'; note.textContent='';
-    } else if(r.status===403){
-      note.style.color='var(--amber)';
-      note.textContent='macOS needs Screen Recording permission. Open System Settings → Privacy & Security → Screen Recording, enable ItsMyPA — I\'ll detect it when you come back.';
-      startSysPermWatch();
+      note.textContent='';
     } else {
       const e=await r.json().catch(()=>({}));
       note.style.color='var(--amber)';
       note.textContent=e.detail || 'Could not enable computer audio.';
     }
   }catch(e){ note.style.color='var(--amber)'; note.textContent='Could not enable computer audio.'; }
-}
-
-/* While the user is off in System Settings granting Screen Recording, re-probe
-   when they return to the app so the grant completes during onboarding — not as
-   a surprise on the first record press. */
-let sysPermWatching=false, sysPermRetries=0;
-function startSysPermWatch(){
-  if(sysPermWatching) return;
-  sysPermWatching=true; sysPermRetries=0;
-  window.addEventListener('focus', sysPermReprobe);
-}
-function stopSysPermWatch(){
-  sysPermWatching=false;
-  window.removeEventListener('focus', sysPermReprobe);
-}
-async function sysPermReprobe(){
-  if(!document.getElementById('onboard-modal').classList.contains('open')){ stopSysPermWatch(); return; }
-  if(sysPermRetries>=5){ stopSysPermWatch(); return; }   // don't churn probes forever
-  try{
-    // Silent preflight first — only run a real capture probe once macOS says
-    // the toggle is on, so returning from System Settings never re-prompts.
-    if(await sysGranted()!==true){ return; }
-    const r=await fetch('/system_audio/start',{method:'POST'});
-    if(r.ok){
-      const d=await r.json();
-      fetch('/system_audio/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({capture_id:d.capture_id})});
-      stopSysPermWatch();
-      markPermGranted('sys');
-      localStorage.removeItem('ms_sys_skipped');
-      const note=document.getElementById('perm-note');
-      note.style.color='var(--muted)'; note.textContent='';
-    } else if(r.status===403 && ++sysPermRetries>=1){
-      // Toggle is on but capture still blocked: macOS applies Screen
-      // Recording changes only after the app restarts.
-      const note=document.getElementById('perm-note');
-      note.style.color='var(--amber)';
-      note.textContent='Almost there — quit ItsMyPA fully (Cmd+Q) and reopen it. macOS applies Screen Recording permission on the next launch.';
-    }
-  }catch(e){}
 }
 
 const SAMPLE_NOTE = {

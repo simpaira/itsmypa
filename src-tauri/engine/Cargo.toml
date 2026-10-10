@@ -19,6 +19,8 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 uuid = { version = "1", features = ["v4"] }
 tar = "0.4"
 bzip2 = "0.5"
+rrule = "0.14"
+chrono-tz = "0.10"
 symphonia = { version = "0.5", features = ["mp3", "aac", "isomp4", "alac"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]

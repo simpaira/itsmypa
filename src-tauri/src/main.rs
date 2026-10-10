@@ -4,8 +4,11 @@
 
 mod ai;
 mod api;
+mod calendar;
 mod jobs;
+mod permissions;
 mod recording;
+mod recovery;
 mod state;
 
 use serde_json::Value;

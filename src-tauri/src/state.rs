@@ -13,6 +13,7 @@ use itsmypa_engine::store::Store;
 use itsmypa_engine::paths;
 use serde::Serialize;
 
+use crate::calendar::Calendar;
 use crate::jobs::Jobs;
 use crate::recording::{Finished, Recorder};
 use std::collections::HashMap;
@@ -47,6 +48,7 @@ pub struct AppState {
     pub asker: Asker,
     pub recorder: Recorder,
     pub jobs: Jobs,
+    pub calendar: Calendar,
     /// Recordings stopped but not yet handed to /transcribe, by id.
     pub finished: Mutex<HashMap<String, Finished>>,
     pub models: Arc<Models>,
@@ -73,6 +75,7 @@ impl AppState {
             asker: Asker::default(),
             recorder: Recorder::default(),
             jobs: Jobs::start(models.clone()),
+            calendar: Calendar::default(),
             finished: Mutex::default(),
             models,
             setup: Arc::new(Mutex::new(Vec::new())),

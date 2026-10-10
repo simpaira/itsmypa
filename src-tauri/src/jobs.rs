@@ -6,7 +6,7 @@ use anyhow::{bail, Result};
 use itsmypa_engine::audio;
 use itsmypa_engine::pipeline::{self, Phase, Transcript};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex};
@@ -35,13 +35,16 @@ struct Job {
 pub struct Jobs {
     jobs: Arc<Mutex<HashMap<String, Job>>>,
     queue: Sender<(String, Input)>,
+    /// Audio files of queued or running jobs (not crash leftovers).
+    busy: Arc<Mutex<HashSet<PathBuf>>>,
 }
 
 impl Jobs {
     pub fn start(models: Arc<Models>) -> Self {
         let jobs: Arc<Mutex<HashMap<String, Job>>> = Arc::default();
+        let busy: Arc<Mutex<HashSet<PathBuf>>> = Arc::default();
         let (queue, rx) = mpsc::channel::<(String, Input)>();
-        let worker_jobs = jobs.clone();
+        let (worker_jobs, worker_busy) = (jobs.clone(), busy.clone());
         std::thread::Builder::new()
             .name("transcribe-worker".into())
             .spawn(move || {
@@ -82,13 +85,22 @@ impl Jobs {
                         }),
                     }
                     update(&|j| j.phase = None);
+                    let mut b = worker_busy.lock().unwrap();
+                    for f in input_files(&input) {
+                        b.remove(&f);
+                    }
                 }
             })
             .expect("could not start the transcription worker");
-        Self { jobs, queue }
+        Self { jobs, queue, busy }
+    }
+
+    pub fn is_busy(&self, path: &std::path::Path) -> bool {
+        self.busy.lock().unwrap().contains(path)
     }
 
     pub fn enqueue(&self, input: Input) -> String {
+        self.busy.lock().unwrap().extend(input_files(&input));
         let id = uuid::Uuid::new_v4().to_string();
         let job = Job { status: "queued", phase: Some("queued"), progress: 0.0, transcript: String::new(), segments: None, error: None };
         self.jobs.lock().unwrap().insert(id.clone(), job);
