@@ -240,7 +240,7 @@
       <a class="btn btn-primary" href="https://github.com/simpaira/itsmypa/releases/latest">⬇️&nbsp; Download for macOS</a>
       <a class="btn btn-ghost" href="https://github.com/simpaira/itsmypa">Read the source&nbsp;↗</a>
     </div>
-    <div class="fineprint">free · open source · Apple Silicon · macOS 13+</div>
+    <div class="fineprint">free · open source · 14 MB · Apple Silicon · macOS 14.6+</div>
   </div>
 </section>
 
@@ -333,7 +333,7 @@
 <section class="how" id="how">
   <div class="wrap">
     <h2 class="section reveal">Three steps. Zero uploads.</h2>
-    <p class="section-sub reveal">First launch downloads the AI models once (~5 GB). After that, airplane mode works.</p>
+    <p class="section-sub reveal">First launch downloads the AI models once (~2.6 GB). After that, airplane mode works.</p>
     <div class="steps">
       <div class="step reveal"><h3>Press record</h3><p>ItsMyPA captures your mic and the meeting's audio from any app — Zoom, Meet, Teams, or a room full of people.</p></div>
       <div class="step reveal"><h3>Speak like a human</h3><p>Whisper transcribes and diarization separates every voice — live, on your own silicon.</p></div>
@@ -378,13 +378,13 @@
     <details class="reveal"><summary>Is it really free? What's the catch?</summary>
       <p>Really free, open source, no account. If it takes off we may add an optional paid tier for power features — the core private notetaker stays free. If it saved you a subscription, you can <a href="https://ko-fi.com/simpaira">buy us a coffee</a> — the first goal is Apple's $99 signing fee so the install warning disappears for everyone.</p></details>
     <details class="reveal"><summary>Does anything ever leave my Mac?</summary>
-      <p>No. The one exception is the first launch, which downloads the AI models (~5 GB, one time) from public model repositories. After that, everything — recording, transcription, summaries, chat — runs locally. Airplane mode works.</p></details>
+      <p>No. The one exception is the first launch, which downloads the AI models (~2.6 GB, one time) from public model repositories. After that, everything — recording, transcription, summaries, chat — runs locally. Airplane mode works.</p></details>
     <details class="reveal"><summary>Why does macOS warn me when I install it?</summary>
       <p>We haven't paid Apple's $99/year code-signing fee yet. The app isn't malware — the full source is public, which proves more than a certificate does. System Settings → Privacy & Security → "Open Anyway", or install via Homebrew. Signing is planned.</p></details>
     <details class="reveal"><summary>What are the requirements?</summary>
-      <p>An Apple Silicon Mac (M1 or newer), macOS 13+, 16 GB RAM recommended, and ~6 GB of disk for the app and models.</p></details>
-    <details class="reveal"><summary>Why is Screen Recording permission needed?</summary>
-      <p>macOS gates <em>system-audio</em> capture (the other people in your call) behind the Screen Recording permission. ItsMyPA never captures or stores your screen — only the audio. Skip it and recording still works, mic-only.</p></details>
+      <p>An Apple Silicon Mac (M1 or newer), macOS 14.6+, 16 GB RAM recommended, and ~4 GB of disk for the app and models.</p></details>
+    <details class="reveal"><summary>What permissions does it need?</summary>
+      <p>Two: <em>Microphone</em> (to hear you) and <em>System Audio Recording</em> (to hear the other people in your call). ItsMyPA never sees your screen — only audio. Skip the second and recording still works, mic-only.</p></details>
     <details class="reveal"><summary>Which languages does it support?</summary>
       <p>Whisper supports ~100 languages. English is strongest; for non-Latin-script languages (Hindi, Arabic, Chinese, Japanese…), switch to a larger Whisper model in Settings for noticeably better accuracy.</p></details>
   </div>

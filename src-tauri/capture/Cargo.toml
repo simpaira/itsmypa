@@ -1,6 +1,6 @@
 [package]
 name = "itsmypa-capture"
-version = "0.1.2"
+version = "0.2.0"
 description = "ItsMyPA native audio capture: microphone + computer audio (loopback) on macOS and Windows"
 edition = "2021"
 

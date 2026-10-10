@@ -1,6 +1,6 @@
 [package]
 name = "itsmypa-engine"
-version = "0.1.2"
+version = "0.2.0"
 description = "ItsMyPA on-device engine: capture, transcription, diarization, local LLM"
 edition = "2021"
 

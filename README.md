@@ -56,11 +56,11 @@ ItsMyPA does everything those tools do, **on your own hardware**:
   record-prompts, full-text search.
 
 All of it powered by on-device models (Whisper, pyannote, TitaNet, a local LLM).
-The first launch downloads them (~5 GB, one time). After that: airplane mode works.
+The first launch downloads them (~2.6 GB, one time). After that: airplane mode works.
 
 ## Get it
 
-**Requirements:** Apple Silicon Mac (M1 or newer), macOS 13+, 16 GB RAM recommended.
+**Requirements:** Apple Silicon Mac (M1 or newer), macOS 14.6+, 16 GB RAM recommended.
 
 1. [Download the latest DMG](https://github.com/simpaira/itsmypa/releases/latest)
 2. Drag ItsMyPA to Applications
