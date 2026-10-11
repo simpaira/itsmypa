@@ -18,6 +18,7 @@ serde_json = { version = "1", features = ["float_roundtrip"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 uuid = { version = "1", features = ["v4"] }
 tar = "0.4"
+fs4 = "1"
 bzip2 = "0.5"
 rrule = "0.14"
 chrono-tz = "0.10"

@@ -44,6 +44,16 @@ impl ModelFile {
         fs::metadata(self.part_path(dir)).map(|m| m.len().min(self.bytes)).unwrap_or(0)
     }
 
+    /// Free disk space needed to install this model from where it is now:
+    /// what's left to download, plus room to unpack an archive (briefly about
+    /// twice its size, until the archive and unused files are removed), plus
+    /// a little headroom.
+    pub fn space_needed(&self, dir: &Path) -> u64 {
+        let remaining = self.bytes - self.partial_bytes(dir);
+        let unpack = if self.unpacked.is_some() { self.bytes * 2 } else { 0 };
+        remaining + unpack + SPACE_HEADROOM
+    }
+
     fn part_path(&self, dir: &Path) -> PathBuf {
         dir.join(format!("{}.part", self.file))
     }
@@ -153,6 +163,22 @@ pub fn locate_llm(models_dir: &Path) -> LlmLocation {
     }
 }
 
+/// Kept free beyond what a model needs, so setup never fills the disk.
+const SPACE_HEADROOM: u64 = 300_000_000;
+
+/// Fails with a plain message when `free` bytes can't fit `needed`.
+fn ensure_space(needed: u64, free: u64) -> Result<()> {
+    if free < needed {
+        let gb = |b: u64| (b as f64 / 1e9 * 10.0).ceil() / 10.0;
+        bail!(
+            "Not enough disk space: ItsMyPA needs about {:.1} GB free to finish setting up, and this Mac has {:.1} GB. Free up some space, then try again.",
+            gb(needed),
+            (free as f64 / 1e8).floor() / 10.0
+        );
+    }
+    Ok(())
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
     Downloading,
@@ -168,6 +194,10 @@ pub fn download(model: &ModelFile, dir: &Path, progress: &mut dyn FnMut(Phase, u
     fs::create_dir_all(dir)?;
     if model.is_installed(dir) {
         return Ok(model.path(dir));
+    }
+    // Fail before downloading anything, not halfway through with a disk error.
+    if let Ok(free) = fs4::available_space(dir) {
+        ensure_space(model.space_needed(dir), free)?;
     }
     let part = model.part_path(dir);
     let mut last_err = None;
@@ -324,6 +354,20 @@ mod tests {
         assert!(!w.join("small-encoder.onnx").exists() && !w.join("small-decoder.onnx").exists());
         assert!(w.join("small-encoder.int8.onnx").exists() && w.join("small-decoder.int8.onnx").exists());
         fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn disk_space_check_counts_unpacking_and_explains_itself() {
+        let dir = std::env::temp_dir().join(format!("itsmypa-space-{}", std::process::id()));
+        // Archive: download + ~2x for unpacking + headroom.
+        assert_eq!(WHISPER.space_needed(&dir), 639_387_718 * 3 + SPACE_HEADROOM);
+        assert_eq!(NOTES_LLM.space_needed(&dir), 1_929_903_264 + SPACE_HEADROOM);
+        assert!(ensure_space(1_000, 2_000).is_ok());
+        let msg = ensure_space(2_230_000_000, 1_460_000_000).unwrap_err().to_string();
+        assert_eq!(
+            msg,
+            "Not enough disk space: ItsMyPA needs about 2.3 GB free to finish setting up, and this Mac has 1.4 GB. Free up some space, then try again."
+        );
     }
 
     #[test]

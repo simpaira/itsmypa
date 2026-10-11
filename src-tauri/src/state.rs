@@ -75,6 +75,10 @@ impl AppState {
             eprintln!("Copied {copied} meetings from notes.json");
         }
         settings::import_legacy_env(&store, &data.join(".env"))?;
+        let removed = crate::recovery::remove_empty_legacy();
+        if removed > 0 {
+            eprintln!("Removed {removed} empty leftover recordings from the old app");
+        }
         let models = Arc::new(Models::default());
         Ok(Self {
             store,

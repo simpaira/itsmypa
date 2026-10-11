@@ -920,6 +920,9 @@ function applySetupVisibility(showPanel, showRecorder){
 // Plain-language reason for a failed setup step.
 function setupFailureText(failed){
   const err=failed.map(c=>c.error||'').join(' ').toLowerCase();
+  // The engine's disk message already says how much is needed and free.
+  const disk=failed.map(c=>c.error||'').find(e=>e.startsWith('Not enough disk space'));
+  if(disk) return disk;
   if(/space|disk|no room/.test(err)) return 'Your Mac is out of disk space. Free up some space, then try again.';
   if(/reach|connect|timed out|timeout|dns|network|stopped at|failed to lookup|resolve/.test(err))
     return 'The download stopped — check your internet connection, then try again.';
