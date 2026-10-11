@@ -14,7 +14,7 @@ fn main() -> anyhow::Result<()> {
     let transcript = std::fs::read_to_string(args.next().expect("usage: summarize <transcript.txt> [model.gguf]"))?;
     let gguf = match args.next() {
         Some(p) => PathBuf::from(p),
-        None => match models::locate_llm(&paths::models_dir(), models::DEFAULT_LLM) {
+        None => match models::locate_llm(&paths::models_dir()) {
             models::LlmLocation::Ready(p) => p,
             models::LlmLocation::NeedsDownload(m) => {
                 anyhow::bail!("{} isn't downloaded yet ({:.1} GB)", m.label, m.bytes as f64 / 1e9)

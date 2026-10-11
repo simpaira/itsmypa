@@ -18,13 +18,14 @@ pub struct ModelPaths {
 }
 
 impl ModelPaths {
-    /// Layout of the sherpa-onnx release archives under `models/`.
-    pub fn new(models_dir: &Path, whisper_model: &str) -> Self {
-        let asr = models_dir.join(format!("sherpa-onnx-whisper-{whisper_model}"));
+    /// Layout of the Whisper "small" archive under `models/` (see
+    /// models::WHISPER — the app uses this one speech model).
+    pub fn new(models_dir: &Path) -> Self {
+        let asr = models_dir.join("sherpa-onnx-whisper-small");
         Self {
-            encoder: asr.join(format!("{whisper_model}-encoder.int8.onnx")),
-            decoder: asr.join(format!("{whisper_model}-decoder.int8.onnx")),
-            tokens: asr.join(format!("{whisper_model}-tokens.txt")),
+            encoder: asr.join("small-encoder.int8.onnx"),
+            decoder: asr.join("small-decoder.int8.onnx"),
+            tokens: asr.join("small-tokens.txt"),
             vad: models_dir.join("silero_vad.onnx"),
         }
     }

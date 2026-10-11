@@ -7,16 +7,11 @@ use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use crate::models;
 use crate::store::Store;
-
-pub const WHISPER_MODELS: &[&str] = &["tiny", "base", "small", "medium", "large-v3"];
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
-    /// tiny | base | small | medium | large-v3
-    pub whisper_model: String,
     /// "" = auto-detect, else a 2-3 letter code ("en", "hi", …).
     pub whisper_language: String,
     pub diarize: bool,
@@ -24,8 +19,6 @@ pub struct Settings {
     pub num_speakers: i32,
     /// Clustering distance; lower = more speakers.
     pub diarize_threshold: f32,
-    /// Notes model id from the catalogue (models::LLMS).
-    pub llm: String,
     /// Secret iCal address for "record this meeting?" prompts ("" = off).
     pub calendar_ics_url: String,
 }
@@ -33,12 +26,10 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            whisper_model: "small".into(),
             whisper_language: String::new(),
             diarize: true,
             num_speakers: -1,
             diarize_threshold: 0.8,
-            llm: models::DEFAULT_LLM.id.into(),
             calendar_ics_url: String::new(),
         }
     }
@@ -48,12 +39,10 @@ impl Default for Settings {
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct SettingsUpdate {
-    pub whisper_model: Option<String>,
     pub whisper_language: Option<String>,
     pub diarize: Option<bool>,
     pub num_speakers: Option<i32>,
     pub diarize_threshold: Option<f32>,
-    pub llm: Option<String>,
     pub calendar_ics_url: Option<String>,
 }
 
@@ -76,12 +65,6 @@ pub fn load(store: &Store) -> Result<Settings> {
 pub fn update(store: &Store, change: SettingsUpdate) -> Result<Saved> {
     let old = load(store)?;
     let mut s = old.clone();
-    if let Some(m) = change.whisper_model {
-        if !WHISPER_MODELS.contains(&m.as_str()) {
-            bail!("Unknown model '{m}'");
-        }
-        s.whisper_model = m;
-    }
     if let Some(lang) = change.whisper_language {
         let lang = lang.trim().to_lowercase();
         if !lang.is_empty() && (!(2..=3).contains(&lang.len()) || !lang.chars().all(|c| c.is_ascii_lowercase())) {
@@ -104,23 +87,15 @@ pub fn update(store: &Store, change: SettingsUpdate) -> Result<Saved> {
         }
         s.diarize_threshold = t;
     }
-    if let Some(id) = change.llm {
-        if models::llm_by_id(&id).is_none() {
-            bail!("Unknown notes model '{id}'");
-        }
-        s.llm = id;
-    }
     if let Some(url) = change.calendar_ics_url {
         s.calendar_ics_url = clean_calendar_url(&url)?;
     }
 
     store.set_meta(KEY, &serde_json::to_string(&s)?)?;
-    let reload_models = s.whisper_model != old.whisper_model
-        || s.whisper_language != old.whisper_language
+    let reload_models = s.whisper_language != old.whisper_language
         || s.diarize != old.diarize
         || s.num_speakers != old.num_speakers
-        || s.diarize_threshold != old.diarize_threshold
-        || s.llm != old.llm;
+        || s.diarize_threshold != old.diarize_threshold;
     Ok(Saved { settings: s, reload_models })
 }
 
@@ -151,7 +126,6 @@ pub fn import_legacy_env(store: &Store, env_path: &Path) -> Result<bool> {
         let value = value.trim().trim_matches('"').trim_matches('\'').to_string();
         let mut change = SettingsUpdate::default();
         match key.trim() {
-            "WHISPER_MODEL" => change.whisper_model = Some(value),
             "WHISPER_LANGUAGE" => change.whisper_language = Some(value),
             "DIARIZE" => change.diarize = Some(!matches!(value.to_lowercase().as_str(), "0" | "false" | "no")),
             "NUM_SPEAKERS" => change.num_speakers = value.parse().ok(),
@@ -182,10 +156,10 @@ mod tests {
     fn defaults_then_roundtrip() {
         let (s, dir) = temp_store("roundtrip");
         assert_eq!(load(&s).unwrap(), Settings::default());
-        let saved = update(&s, SettingsUpdate { whisper_model: Some("medium".into()), num_speakers: Some(3), ..Default::default() }).unwrap();
+        let saved = update(&s, SettingsUpdate { whisper_language: Some("de".into()), num_speakers: Some(3), ..Default::default() }).unwrap();
         assert!(saved.reload_models);
         let back = load(&s).unwrap();
-        assert_eq!((back.whisper_model.as_str(), back.num_speakers), ("medium", 3));
+        assert_eq!((back.whisper_language.as_str(), back.num_speakers), ("de", 3));
         // Calendar changes apply live: no model reload.
         let saved = update(&s, SettingsUpdate { calendar_ics_url: Some("webcal://cal.example/x.ics".into()), ..Default::default() }).unwrap();
         assert!(!saved.reload_models);
@@ -198,11 +172,9 @@ mod tests {
     fn bad_values_are_rejected_and_nothing_is_saved() {
         let (s, dir) = temp_store("bad");
         let bad = [
-            SettingsUpdate { whisper_model: Some("huge".into()), ..Default::default() },
             SettingsUpdate { whisper_language: Some("english".into()), ..Default::default() },
             SettingsUpdate { num_speakers: Some(0), ..Default::default() },
             SettingsUpdate { diarize_threshold: Some(3.0), ..Default::default() },
-            SettingsUpdate { llm: Some("gpt-9".into()), ..Default::default() },
             SettingsUpdate { calendar_ics_url: Some("ftp://x".into()), ..Default::default() },
             SettingsUpdate { calendar_ics_url: Some("https://x.example/a\nHOST=0.0.0.0".into()), ..Default::default() },
         ];
@@ -223,7 +195,6 @@ mod tests {
         assert!(!import_legacy_env(&s, &env).unwrap(), "only once");
         assert_eq!(std::fs::read_to_string(&env).unwrap(), original, "file unchanged");
         let got = load(&s).unwrap();
-        assert_eq!(got.whisper_model, "medium");
         assert_eq!(got.whisper_language, "hi");
         assert!(!got.diarize);
         assert_eq!(got.num_speakers, -1, "99 is invalid, default kept");

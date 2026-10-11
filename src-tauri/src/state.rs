@@ -25,10 +25,16 @@ use std::sync::{Arc, Mutex};
 pub struct Component {
     pub id: &'static str,
     pub label: String,
-    /// pending | downloading | extracting | loading | ready | skipped | error
+    /// pending | downloading | verifying | extracting | loading | ready | skipped | error
     pub status: &'static str,
     pub bytes: u64,
     pub total: u64,
+    /// Bytes this model still needed to download when setup started (0 if
+    /// it was already installed) — what the progress bar counts.
+    pub size: u64,
+    /// Bytes already on disk from an interrupted download (resumed, so not
+    /// counted as progress).
+    pub resumed: u64,
     pub error: Option<String>,
 }
 
@@ -93,22 +99,27 @@ impl AppState {
     pub fn load_models(&self) {
         let gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
         let s = self.settings();
-        let llm_choice = models::llm_by_id(&s.llm).unwrap_or(models::DEFAULT_LLM);
-        let whisper = models::whisper(&s.whisper_model).unwrap_or(&models::WHISPERS[2]);
 
         // What's needed, in load order.
-        let mut plan: Vec<(&'static str, &'static ModelFile)> = vec![("vad", &models::VAD), ("asr", whisper)];
+        let mut plan: Vec<(&'static str, &'static ModelFile)> = vec![("vad", &models::VAD), ("asr", &models::WHISPER)];
         if s.diarize {
             plan.push(("seg", &models::SPEAKER_SEGMENTATION));
             plan.push(("emb", &models::SPEAKER_EMBEDDING));
         }
         let llm_override = std::env::var_os("LLM_GGUF").map(std::path::PathBuf::from);
         if llm_override.is_none() {
-            plan.push(("llm", llm_choice));
+            plan.push(("llm", &models::NOTES_LLM));
         }
 
-        let component = |id: &'static str, label: String, status: &'static str| Component { id, label, status, bytes: 0, total: 0, error: None };
-        let mut rows: Vec<Component> = plan.iter().map(|(id, m)| component(id, m.label.to_string(), "pending")).collect();
+        let dir = paths::models_dir();
+        let component = |id: &'static str, label: String, status: &'static str| Component { id, label, status, bytes: 0, total: 0, size: 0, resumed: 0, error: None };
+        let mut rows: Vec<Component> = plan
+            .iter()
+            .map(|(id, m)| {
+                let (size, resumed) = if m.is_installed(&dir) { (0, 0) } else { let r = m.partial_bytes(&dir); (m.bytes - r, r) };
+                Component { size, resumed, ..component(id, m.label.to_string(), "pending") }
+            })
+            .collect();
         if !s.diarize {
             rows.push(component("seg", models::SPEAKER_SEGMENTATION.label.into(), "skipped"));
             rows.push(component("emb", models::SPEAKER_EMBEDDING.label.into(), "skipped"));
@@ -131,42 +142,47 @@ impl AppState {
                         }
                     }
                 };
-                let dir = paths::models_dir();
 
-                // 1. Download whatever is missing.
-                let mut ok: Vec<&str> = Vec::new();
-                for (id, m) in &plan {
-                    if !current() {
-                        return;
-                    }
+                let fail = |id: &str, e: anyhow::Error| set(id, &|c| {
+                    c.status = "error";
+                    c.error = Some(format!("{e:#}"));
+                });
+                let ready = |id: &str| set(id, &|c| c.status = "ready");
+                // Download one planned model if it's missing. False on failure
+                // (or when it isn't part of this plan).
+                let fetch = |id: &str| -> bool {
+                    let Some((_, m)) = plan.iter().find(|(pid, _)| *pid == id) else { return false };
                     let res = models::download(m, &dir, &mut |phase, done, total| {
-                        let status = if phase == Phase::Unpacking { "extracting" } else { "downloading" };
+                        let status = match phase {
+                            Phase::Downloading => "downloading",
+                            Phase::Verifying => "verifying",
+                            Phase::Unpacking => "extracting",
+                        };
                         set(id, &|c| {
                             c.status = status;
                             c.bytes = done;
                             c.total = total;
                         });
                     });
-                    match res {
-                        Ok(_) => ok.push(id),
-                        Err(e) => set(id, &|c| {
-                            c.status = "error";
-                            c.error = Some(format!("{e:#}"));
-                        }),
+                    if res.is_ok() {
+                        // Also tidies installs from before unused files were removed.
+                        let freed = m.remove_unused(&dir);
+                        if freed > 0 {
+                            eprintln!("Removed {:.0} MB of unused {} files", freed as f64 / 1e6, m.label);
+                        }
                     }
-                }
+                    res.map_err(|e| fail(id, e)).is_ok()
+                };
 
-                // 2. Load them.
-                let fail = |id: &str, e: anyhow::Error| set(id, &|c| {
-                    c.status = "error";
-                    c.error = Some(format!("{e:#}"));
-                });
-                let ready = |id: &str| set(id, &|c| c.status = "ready");
+                // In order of need, each downloaded *and loaded* before the
+                // next starts: transcription first, so recording works while
+                // the much bigger notes AI is still downloading.
 
+                // 1. Transcription.
                 *models_.asr.lock().unwrap() = None;
-                if ok.contains(&"vad") && ok.contains(&"asr") {
+                if fetch("vad") && fetch("asr") && current() {
                     set("asr", &|c| c.status = "loading");
-                    match Asr::load(&ModelPaths::new(&dir, &s.whisper_model), &s.whisper_language) {
+                    match Asr::load(&ModelPaths::new(&dir), &s.whisper_language) {
                         Ok(asr) => {
                             *models_.asr.lock().unwrap() = Some(asr);
                             ready("asr");
@@ -176,8 +192,9 @@ impl AppState {
                     }
                 }
 
+                // 2. Speaker detection (optional: transcripts just lose labels).
                 *models_.diarizer.lock().unwrap() = None;
-                if s.diarize && ok.contains(&"seg") && ok.contains(&"emb") {
+                if s.diarize && fetch("seg") && fetch("emb") && current() {
                     let cfg = DiarizeConfig { num_speakers: s.num_speakers, threshold: s.diarize_threshold, ..Default::default() };
                     match Diarizer::load(&dir, cfg) {
                         Ok(d) => {
@@ -185,12 +202,12 @@ impl AppState {
                             ready("seg");
                             ready("emb");
                         }
-                        // Diarization is optional: transcripts just lose speaker labels.
                         Err(e) => fail("seg", e),
                     }
                 }
 
-                let llm_path = llm_override.clone().or_else(|| ok.contains(&"llm").then(|| llm_choice.path(&dir)));
+                // 3. Notes AI.
+                let llm_path = llm_override.clone().or_else(|| (fetch("llm") && current()).then(|| models::NOTES_LLM.path(&dir)));
                 *models_.llm.lock().unwrap() = None;
                 if let Some(path) = llm_path {
                     set("llm", &|c| c.status = "loading");

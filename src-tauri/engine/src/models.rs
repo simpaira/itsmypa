@@ -24,6 +24,9 @@ pub struct ModelFile {
     /// For a .tar.bz2 archive: the file (relative to the models dir) that
     /// exists once it is unpacked. None for plain files.
     pub unpacked: Option<&'static str>,
+    /// Files from the archive the app never uses, deleted after unpacking
+    /// (relative to the models dir).
+    pub unused: &'static [&'static str],
 }
 
 impl ModelFile {
@@ -35,6 +38,31 @@ impl ModelFile {
     pub fn is_installed(&self, dir: &Path) -> bool {
         self.path(dir).exists()
     }
+
+    /// Bytes of an earlier, interrupted download that will be resumed.
+    pub fn partial_bytes(&self, dir: &Path) -> u64 {
+        fs::metadata(self.part_path(dir)).map(|m| m.len().min(self.bytes)).unwrap_or(0)
+    }
+
+    fn part_path(&self, dir: &Path) -> PathBuf {
+        dir.join(format!("{}.part", self.file))
+    }
+
+    /// Delete archive files the app never uses. Only runs once the model is
+    /// installed, so it can't remove anything needed. Returns bytes freed.
+    pub fn remove_unused(&self, dir: &Path) -> u64 {
+        if !self.is_installed(dir) {
+            return 0;
+        }
+        self.unused
+            .iter()
+            .map(|f| dir.join(f))
+            .filter_map(|p| {
+                let len = fs::metadata(&p).ok()?.len();
+                fs::remove_file(&p).ok().map(|_| len)
+            })
+            .sum()
+    }
 }
 
 pub const VAD: ModelFile = ModelFile {
@@ -45,6 +73,7 @@ pub const VAD: ModelFile = ModelFile {
     sha256: Some("9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"),
     bytes: 643_854,
     unpacked: None,
+    unused: &[],
 };
 
 pub const SPEAKER_SEGMENTATION: ModelFile = ModelFile {
@@ -55,6 +84,7 @@ pub const SPEAKER_SEGMENTATION: ModelFile = ModelFile {
     sha256: Some("24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488"),
     bytes: 6_958_444,
     unpacked: Some("sherpa-onnx-pyannote-segmentation-3-0/model.onnx"),
+    unused: &[],
 };
 
 pub const SPEAKER_EMBEDDING: ModelFile = ModelFile {
@@ -66,57 +96,31 @@ pub const SPEAKER_EMBEDDING: ModelFile = ModelFile {
     sha256: Some("ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e"),
     bytes: 40_257_283,
     unpacked: None,
+    unused: &[],
 };
 
-macro_rules! whisper {
-    ($size:literal, $bytes:expr, $sha:expr) => {
-        ModelFile {
-            id: concat!("whisper-", $size),
-            label: concat!("Speech recognition (", $size, ")"),
-            file: concat!("sherpa-onnx-whisper-", $size, ".tar.bz2"),
-            urls: &[concat!("https://github.com/k2-fsa/sherpa-onnx/releases/download", "/asr-models/sherpa-onnx-whisper-", $size, ".tar.bz2")],
-            sha256: $sha,
-            bytes: $bytes,
-            unpacked: Some(concat!("sherpa-onnx-whisper-", $size, "/", $size, "-encoder.int8.onnx")),
-        }
-    };
-}
-
-pub const WHISPERS: &[ModelFile] = &[
-    whisper!("tiny", 116_204_861, Some(WHISPER_TINY_SHA)),
-    whisper!("base", 207_557_382, Some(WHISPER_BASE_SHA)),
-    whisper!("small", 639_387_718, Some(WHISPER_SMALL_SHA)),
-    whisper!("medium", 1_931_372_882, None),
-    whisper!("large-v3", 1_068_482_488, None),
-];
-
-const WHISPER_TINY_SHA: &str = "c46116994e539aa165266d96b325252728429c12535eb9d8b6a2b10f129e66b1";
-const WHISPER_BASE_SHA: &str = "911b2083efd7c0dca2ac3b358b75222660dc09fb716d64fbfc417ba6c99ff3de";
-const WHISPER_SMALL_SHA: &str = "486a46afbb7ba798507190ffe02fea2dd726049af212e774537efac6afb210a6";
-
-pub fn whisper(size: &str) -> Option<&'static ModelFile> {
-    WHISPERS.iter().find(|m| m.id.strip_prefix("whisper-") == Some(size))
-}
-
-/// Optional "better notes" model for bigger machines (16 GB+). In a
-/// side-by-side test it caught every decision and used participants' names
-/// where Qwen2.5-3B missed one — at 2.5x the download and ~1.6x the memory.
-pub const GEMMA4_E4B: ModelFile = ModelFile {
-    id: "gemma4-e4b",
-    label: "Gemma 4 E4B (better notes, larger)",
-    file: "gemma-4-E4B-it-Q4_K_M.gguf",
-    urls: &["https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/e1d90e5fb9f61d8dc71ef016580784a054e5c787/gemma-4-E4B-it-Q4_K_M.gguf"],
-    sha256: Some("519b9793ed6ce0ff530f1b7c96e848e08e49e7af4d57bb97f76215963a54146d"),
-    bytes: 4_977_169_568,
-    unpacked: None,
+/// Speech recognition: Whisper "small" (int8). The best balance for an
+/// average computer — about 6x faster than realtime on Apple Silicon, fine on
+/// older laptops, ~100 languages. The app uses this one model only.
+pub const WHISPER: ModelFile = ModelFile {
+    id: "asr",
+    label: "Speech recognition",
+    file: "sherpa-onnx-whisper-small.tar.bz2",
+    urls: &["https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.tar.bz2"],
+    sha256: Some("486a46afbb7ba798507190ffe02fea2dd726049af212e774537efac6afb210a6"),
+    bytes: 639_387_718,
+    unpacked: Some("sherpa-onnx-whisper-small/small-encoder.int8.onnx"),
+    // The archive also ships full-precision copies (~1 GB); the app only
+    // loads the int8 ones.
+    unused: &["sherpa-onnx-whisper-small/small-encoder.onnx", "sherpa-onnx-whisper-small/small-decoder.onnx"],
 };
 
-/// Default notes model: small first download (1.9 GB), fast, and runs well
-/// even on 8 GB laptops — keeping installs light matters more than the small
-/// quality gain from a bigger model.
-pub const QWEN25_3B: ModelFile = ModelFile {
-    id: "qwen2.5-3b",
-    label: "Qwen2.5 3B (default)",
+/// Meeting notes AI: Qwen2.5 3B (Q4_K_M). Small first download (1.9 GB),
+/// fast, and runs well even on 8 GB machines. The app uses this one model
+/// only (developers can point `$LLM_GGUF` at another GGUF to experiment).
+pub const NOTES_LLM: ModelFile = ModelFile {
+    id: "llm",
+    label: "Meeting notes AI",
     file: "Qwen2.5-3B-Instruct-Q4_K_M.gguf",
     // HF's CDN rate-limits anonymous large downloads per IP (403), so fall
     // back to ModelScope, which mirrors the identical bartowski file.
@@ -127,38 +131,33 @@ pub const QWEN25_3B: ModelFile = ModelFile {
     sha256: Some("9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94"),
     bytes: 1_929_903_264,
     unpacked: None,
+    unused: &[],
 };
-
-pub const DEFAULT_LLM: &ModelFile = &QWEN25_3B;
-
-pub const LLMS: &[ModelFile] = &[QWEN25_3B, GEMMA4_E4B];
-
-pub fn llm_by_id(id: &str) -> Option<&'static ModelFile> {
-    LLMS.iter().find(|m| m.id == id)
-}
 
 pub enum LlmLocation {
     Ready(PathBuf),
     NeedsDownload(&'static ModelFile),
 }
 
-/// Where the notes model comes from. `$LLM_GGUF` (power users) wins; then the
-/// chosen catalogue model if it's on disk; otherwise it must be downloaded.
-pub fn locate_llm(models_dir: &Path, choice: &'static ModelFile) -> LlmLocation {
+/// Where the notes model comes from: `$LLM_GGUF` (developers) wins; then
+/// the notes model if it's on disk; otherwise it must be downloaded.
+pub fn locate_llm(models_dir: &Path) -> LlmLocation {
     if let Some(p) = std::env::var_os("LLM_GGUF") {
         return LlmLocation::Ready(PathBuf::from(p));
     }
-    let path = models_dir.join(choice.file);
+    let path = NOTES_LLM.path(models_dir);
     if path.exists() {
         LlmLocation::Ready(path)
     } else {
-        LlmLocation::NeedsDownload(choice)
+        LlmLocation::NeedsDownload(&NOTES_LLM)
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
     Downloading,
+    /// Checking the SHA-256 (a few seconds for the big files).
+    Verifying,
     Unpacking,
 }
 
@@ -170,11 +169,23 @@ pub fn download(model: &ModelFile, dir: &Path, progress: &mut dyn FnMut(Phase, u
     if model.is_installed(dir) {
         return Ok(model.path(dir));
     }
-    let part = dir.join(format!("{}.part", model.file));
+    let part = model.part_path(dir);
     let mut last_err = None;
     for url in model.urls {
-        let got = fetch(url, &part, model.bytes, &mut |d, t| progress(Phase::Downloading, d, t))
-            .and_then(|_| model.sha256.map_or(Ok(()), |sha| verify(&part, sha)));
+        // A dropped connection resumes automatically a few times before the
+        // user is asked to "Try again".
+        let mut got = Err(anyhow::anyhow!("not started"));
+        for attempt in 1..=DOWNLOAD_ATTEMPTS {
+            got = fetch(url, &part, model.bytes, &mut |d, t| progress(Phase::Downloading, d, t));
+            if got.is_ok() || attempt == DOWNLOAD_ATTEMPTS {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_secs(2 * attempt as u64));
+        }
+        let got = got.and_then(|_| {
+            progress(Phase::Verifying, model.bytes, model.bytes);
+            model.sha256.map_or(Ok(()), |sha| verify(&part, sha))
+        });
         match got {
             Ok(()) => {
                 if model.unpacked.is_some() {
@@ -182,6 +193,7 @@ pub fn download(model: &ModelFile, dir: &Path, progress: &mut dyn FnMut(Phase, u
                     let unpacked = unpack(&part, dir);
                     fs::remove_file(&part).ok();
                     unpacked?;
+                    model.remove_unused(dir);
                     if !model.is_installed(dir) {
                         bail!("{} unpacked without {}", model.file, model.unpacked.unwrap_or_default());
                     }
@@ -218,12 +230,22 @@ fn host(url: &str) -> &str {
     url.split('/').nth(2).unwrap_or(url)
 }
 
+/// Tries per mirror before giving up (each one resumes where the last stopped).
+const DOWNLOAD_ATTEMPTS: u32 = 4;
+
 fn fetch(url: &str, part: &Path, total: u64, progress: &mut dyn FnMut(u64, u64)) -> Result<()> {
     let have = fs::metadata(part).map(|m| m.len()).unwrap_or(0);
     if have == total {
         return Ok(()); // fully downloaded earlier; just needs verifying
     }
-    let mut req = ureq::get(url).timeout(std::time::Duration::from_secs(60));
+    // Give up on a *stalled* connection (nothing for 60 s), never on a long
+    // download: an overall timeout would cut every big model off after a
+    // minute on a normal home connection.
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(30))
+        .timeout_read(std::time::Duration::from_secs(60))
+        .build();
+    let mut req = agent.get(url);
     if have > 0 {
         req = req.set("Range", &format!("bytes={have}-"));
     }
@@ -285,10 +307,30 @@ mod tests {
     }
 
     #[test]
+    fn unused_whisper_files_are_removed_only_when_installed() {
+        let dir = std::env::temp_dir().join(format!("itsmypa-unused-{}", std::process::id()));
+        let w = dir.join("sherpa-onnx-whisper-small");
+        fs::create_dir_all(&w).unwrap();
+        let small = &WHISPER;
+        fs::write(w.join("small-encoder.onnx"), vec![0u8; 1000]).unwrap();
+        fs::write(w.join("small-decoder.onnx"), vec![0u8; 500]).unwrap();
+        // Without the int8 model present nothing is touched.
+        assert_eq!(small.remove_unused(&dir), 0);
+        assert!(w.join("small-encoder.onnx").exists());
+
+        fs::write(w.join("small-encoder.int8.onnx"), b"int8").unwrap();
+        fs::write(w.join("small-decoder.int8.onnx"), b"int8").unwrap();
+        assert_eq!(small.remove_unused(&dir), 1500);
+        assert!(!w.join("small-encoder.onnx").exists() && !w.join("small-decoder.onnx").exists());
+        assert!(w.join("small-encoder.int8.onnx").exists() && w.join("small-decoder.int8.onnx").exists());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn default_choice_needs_download_in_an_empty_dir() {
         let dir = std::env::temp_dir().join(format!("itsmypa-models-{}", std::process::id()));
         if std::env::var_os("LLM_GGUF").is_none() {
-            assert!(matches!(locate_llm(&dir, DEFAULT_LLM), LlmLocation::NeedsDownload(m) if m.id == "qwen2.5-3b"));
+            assert!(matches!(locate_llm(&dir), LlmLocation::NeedsDownload(m) if m.id == "llm"));
         }
     }
 }

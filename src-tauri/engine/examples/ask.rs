@@ -26,7 +26,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     let store = Store::open(&PathBuf::from(args.remove(0)))?;
-    let models::LlmLocation::Ready(gguf) = models::locate_llm(&paths::models_dir(), models::DEFAULT_LLM) else {
+    let models::LlmLocation::Ready(gguf) = models::locate_llm(&paths::models_dir()) else {
         anyhow::bail!("the default notes model isn't downloaded yet");
     };
     let llm = Llm::load(&gguf, DEFAULT_N_CTX)?;

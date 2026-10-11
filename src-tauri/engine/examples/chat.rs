@@ -11,7 +11,7 @@ use std::time::Instant;
 fn main() -> anyhow::Result<()> {
     let mut args = std::env::args().skip(1);
     let transcript = std::fs::read_to_string(args.next().expect("usage: chat <transcript.txt> <question>…"))?;
-    let models::LlmLocation::Ready(gguf) = models::locate_llm(&paths::models_dir(), models::DEFAULT_LLM) else {
+    let models::LlmLocation::Ready(gguf) = models::locate_llm(&paths::models_dir()) else {
         anyhow::bail!("the default notes model isn't downloaded yet");
     };
     let llm = Llm::load(&gguf, DEFAULT_N_CTX)?;

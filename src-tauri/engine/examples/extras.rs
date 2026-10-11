@@ -10,7 +10,7 @@ fn main() -> anyhow::Result<()> {
     let mut args = std::env::args().skip(1);
     let transcript = std::fs::read_to_string(args.next().expect("usage: extras <transcript.txt> [note]…"))?;
     let scratchpad = args.map(|n| format!("- {n}")).collect::<Vec<_>>().join("\n");
-    let models::LlmLocation::Ready(gguf) = models::locate_llm(&paths::models_dir(), models::DEFAULT_LLM) else {
+    let models::LlmLocation::Ready(gguf) = models::locate_llm(&paths::models_dir()) else {
         anyhow::bail!("the default notes model isn't downloaded yet");
     };
     let llm = Llm::load(&gguf, DEFAULT_N_CTX)?;

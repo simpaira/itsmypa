@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ItsMyPA</title>
 <script src="api.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600;6..72,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --font-ui:'Inter',system-ui,-apple-system,sans-serif;
-    --font-display:'Newsreader',Georgia,'Times New Roman',serif;
-    --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    /* System fonts only: nothing is fetched from the internet, and the app
+       looks the same offline. (Windows falls back to Segoe UI / Georgia /
+       Consolas.) */
+    --font-ui:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    --font-display:ui-serif,'New York',Georgia,serif;
+    --font-mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
 
     --paper:#F7F6F1; --panel:#FFFFFF; --subtle:#EFEDE5; --hover:#ECEAE1;
     --border:#E5E2D8; --border2:#D7D3C6;
@@ -278,6 +278,17 @@
   .setup-item.err .setup-item-detail{color:var(--red)}
   .setup-item.skip{opacity:.55}
   .setup-hint{margin-top:16px;font-size:12px;color:var(--muted);line-height:1.55;text-align:center}
+  .setup-panel.failed .setup-title .icon,.setup-panel.failed .setup-pct{color:var(--red)}
+  .setup-panel.failed .proc-bar>i{background:var(--red)}
+  .setup-error{display:none;align-items:center;gap:12px;margin-top:14px;padding:12px 14px;border-radius:10px;
+    background:color-mix(in srgb,var(--red) 8%,transparent);border:1px solid color-mix(in srgb,var(--red) 25%,transparent)}
+  .setup-panel.failed .setup-error{display:flex}
+  .setup-panel.failed .setup-hint{display:none}
+  .setup-detail{margin-top:8px;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;min-height:1em}
+  /* Recording already works; only the notes AI is still downloading. */
+  .setup-panel.background{padding-bottom:16px;margin-bottom:14px;border-bottom:1px solid var(--border)}
+  .setup-panel.background .setup-list{display:none}
+  .setup-error span{flex:1;font-size:13px;color:var(--ink);line-height:1.45}
 
   .doc-title{font-family:var(--font-display);font-size:33px;font-weight:600;letter-spacing:-.4px;line-height:1.25;
     border:none;background:transparent;width:100%;color:var(--ink);padding:0}
@@ -577,18 +588,8 @@
     <div class="modal-head"><span class="icon" id="settings-icon"></span><span class="modal-head-title">Settings</span></div>
     <div class="modal-body">
       <div class="set-row">
-        <label for="set-model">Transcription accuracy</label>
-        <select class="select" id="set-model" onchange="checkLangModelHint()">
-          <option value="tiny">Fastest (tiny)</option>
-          <option value="base">Fast (base)</option>
-          <option value="small">Balanced (small) — recommended for English</option>
-          <option value="medium">More accurate (medium, slower)</option>
-          <option value="large-v3">Best accuracy (large-v3, slowest, ~3GB)</option>
-        </select>
-      </div>
-      <div class="set-row">
         <label for="set-lang">Spoken language</label>
-        <select class="select" id="set-lang" onchange="checkLangModelHint()">
+        <select class="select" id="set-lang">
           <option value="">Auto-detect</option>
           <option value="en">English</option><option value="es">Spanish</option>
           <option value="fr">French</option><option value="de">German</option>
@@ -600,7 +601,6 @@
           <option value="tr">Turkish</option>
         </select>
       </div>
-      <div class="set-hint" id="lang-model-hint" style="display:none"></div>
       <div class="set-row">
         <label for="set-diarize">Identify speakers</label>
         <input type="checkbox" id="set-diarize" class="set-toggle">
@@ -874,16 +874,21 @@ let modelsReady=false, setupHasError=false, setupWasBlocking=false, setupPollTim
 function setupPanelHTML(){
   return `<div class="setup-panel" id="setup-panel" style="display:none">
     <div class="setup-head">
-      <span class="setup-title">${icon('sparkles')} Setting up ItsMyPA</span>
+      <span class="setup-title">${icon('sparkles')} <span id="setup-title-text">Setting up ItsMyPA</span></span>
       <span class="setup-pct" id="setup-pct">0%</span>
     </div>
     <div class="proc-bar indeterminate" id="setup-bar"><i></i></div>
+    <div class="setup-detail" id="setup-detail"></div>
+    <div class="setup-error" role="alert">
+      <span id="setup-error-text"></span>
+      <button class="btn btn-accent btn-sm" id="setup-retry" onclick="retrySetup()">Try again</button>
+    </div>
     <div class="setup-list" id="setup-list"></div>
     <div class="setup-hint">Downloading the on-device AI models — this only happens once, and needs an internet connection. Everything runs locally afterward.</div>
   </div>`;
 }
 
-const SETUP_STATUS_LABEL = {pending:'Waiting…', downloading:'Downloading…', extracting:'Unpacking…',
+const SETUP_STATUS_LABEL = {pending:'Waiting…', downloading:'Downloading…', verifying:'Checking…', extracting:'Unpacking…',
   loading:'Loading…', ready:'Ready', skipped:'Not needed', error:'Failed'};
 const SETUP_STATUS_ICON = {ready:'checkcircle', skipped:'checkcircle', error:'close'};
 
@@ -893,9 +898,7 @@ function renderSetupComponents(components){
     const cls = c.status==='ready'?'ok':c.status==='error'?'err':c.status==='skipped'?'skip'
       :(c.status==='pending'?'':'active');
     let detail = SETUP_STATUS_LABEL[c.status] || c.status;
-    if((c.status==='downloading'||c.status==='extracting') && c.total){
-      detail = `${(c.bytes/1e6).toFixed(0)} / ${(c.total/1e6).toFixed(0)} MB`;
-    }
+    if(c.status==='downloading' && c.total) detail = `${fmtBytes(c.bytes)} of ${fmtBytes(c.total)}`;
     const ic = SETUP_STATUS_ICON[c.status] || 'clock';
     return `<div class="setup-item ${cls}" title="${c.error?escAttr(c.error):''}">
       <span class="icon">${icon(ic)}</span>
@@ -905,33 +908,112 @@ function renderSetupComponents(components){
   }).join('');
 }
 
-function applySetupVisibility(ready){
+// The setup panel shows while downloading, and stays (in red, with Try again)
+// if anything failed. The recorder shows as soon as recording is possible —
+// even next to a failure (e.g. only speaker detection failed).
+function applySetupVisibility(showPanel, showRecorder){
   const sp=document.getElementById('setup-panel'), rn=document.getElementById('recorder-normal');
-  if(sp) sp.style.display = ready ? 'none' : '';
-  if(rn) rn.style.display = ready ? '' : 'none';
+  if(sp) sp.style.display = showPanel ? '' : 'none';
+  if(rn) rn.style.display = showRecorder ? '' : 'none';
+}
+
+// Plain-language reason for a failed setup step.
+function setupFailureText(failed){
+  const err=failed.map(c=>c.error||'').join(' ').toLowerCase();
+  if(/space|disk|no room/.test(err)) return 'Your Mac is out of disk space. Free up some space, then try again.';
+  if(/reach|connect|timed out|timeout|dns|network|stopped at|failed to lookup|resolve/.test(err))
+    return 'The download stopped — check your internet connection, then try again.';
+  return 'Something went wrong while setting up ('+(failed[0].error||'unknown error').slice(0,120)+').';
+}
+
+async function retrySetup(){
+  const b=document.getElementById('setup-retry'); if(b) b.disabled=true;
+  try{ await fetch('/setup/retry',{method:'POST'}); }catch(e){}
+  setupWasBlocking=true;
+  checkSetupStatus();
+}
+
+let lastSetup=null;   // latest /setup/status answer, so any redraw can re-apply it
+let setupSpeed=[];    // recent [time, done_bytes] samples, for "about N min left"
+
+function fmtBytes(b){ return b>=1e9 ? (b/1e9).toFixed(1)+' GB' : Math.round(b/1e6)+' MB'; }
+
+// "1.2 of 2.6 GB · about 4 min left" from the download speed over the last ~15 s.
+function setupDetailText(d){
+  if(!d.total_bytes || !d.working || d.has_error) return '';
+  // Between downloads: say what's happening instead of a stalled number.
+  const busy = s => d.components.some(c=>c.status===s);
+  if(busy('extracting')) return 'Unpacking the speech model…';
+  if(busy('verifying')) return 'Checking the download…';
+  const now=Date.now();
+  setupSpeed.push([now, d.done_bytes]);
+  setupSpeed=setupSpeed.filter(([t])=>now-t<15000);
+  let text=`${fmtBytes(d.done_bytes)} of ${fmtBytes(d.total_bytes)}`;
+  const [t0,b0]=setupSpeed[0];
+  const rate=(d.done_bytes-b0)/((now-t0)/1000);   // bytes per second
+  const left=d.total_bytes-d.done_bytes;
+  if(rate>0 && now-t0>3000 && left>0){
+    const mins=Math.ceil(left/rate/60);
+    text += mins<=1 ? ' · less than a minute left'
+          : mins<=90 ? ` · about ${mins} min left`
+          : ' · slow connection — this may take a while';
+  }
+  return text;
+}
+
+// Draw the setup panel / recorder from a status answer (safe to call after
+// the home screen is re-rendered).
+function renderSetup(d){
+  if(!d) return;
+  const failed = d.components.filter(c=>c.status==='error');
+  document.getElementById('setup-panel')?.classList.toggle('failed', failed.length>0);
+  const title=document.getElementById('setup-title-text');
+  const pctEl=document.getElementById('setup-pct'), bar=document.getElementById('setup-bar');
+  const detailEl=document.getElementById('setup-detail'); if(detailEl) detailEl.textContent=setupDetailText(d);
+  if(pctEl) pctEl.textContent = Math.round(d.overall_percent)+'%';
+  if(bar){ bar.classList.remove('indeterminate'); const i=bar.querySelector('i'); if(i) i.style.width=d.overall_percent+'%'; }
+  if(failed.length){
+    // Stay visible until the user retries — never hide a failure.
+    applySetupVisibility(true, d.ready);
+    renderSetupComponents(d.components);
+    if(title) title.textContent='Setup didn\'t finish';
+    const et=document.getElementById('setup-error-text'); if(et) et.textContent=setupFailureText(failed);
+    const b=document.getElementById('setup-retry'); if(b) b.disabled=false;
+  } else {
+    // Downloading in the background while recording already works.
+    const background = d.ready && d.working;
+    document.getElementById('setup-panel')?.classList.toggle('background', background);
+    if(title) title.textContent = background ? 'Getting AI notes ready' : 'Setting up ItsMyPA';
+    const hint=document.querySelector('#setup-panel .setup-hint');
+    if(hint) hint.textContent = background
+      ? 'You can record now — notes are written as soon as this finishes.'
+      : 'Downloading the on-device AI models — this only happens once, and needs an internet connection. Everything runs locally afterward.';
+    applySetupVisibility(d.working, d.ready);
+    if(d.working) renderSetupComponents(d.components);
+  }
+  updateRecPill();
 }
 
 async function checkSetupStatus(){
   clearTimeout(setupPollTimer);
   try{
     const d = await fetch('/setup/status').then(r=>r.json());
+    lastSetup = d;
     modelsReady = d.ready; setupHasError = d.has_error;
-    applySetupVisibility(d.ready);
-    if(!d.ready){
-      setupWasBlocking = true;
-      renderSetupComponents(d.components);
-      const pctEl=document.getElementById('setup-pct'); if(pctEl) pctEl.textContent = Math.round(d.overall_percent)+'%';
-      const bar=document.getElementById('setup-bar');
-      if(bar){ bar.classList.remove('indeterminate'); const i=bar.querySelector('i'); if(i) i.style.width=d.overall_percent+'%'; }
-      updateRecPill();
-      setupPollTimer = setTimeout(checkSetupStatus, 1200);
+    renderSetup(d);
+    if(d.has_error){
+      setupPollTimer = setTimeout(checkSetupStatus, 20000);   // waits for Try again
       return;
     }
-    updateRecPill();
-    if(setupWasBlocking){
+    if(d.ready && setupWasBlocking){
       setupWasBlocking=false;
-      showToast(d.has_error ? 'Setup finished, but something failed — check Settings' : 'Ready to record','success');
+      showToast(d.working ? 'Ready to record — AI notes are still downloading' : 'Ready to record','success');
       checkHealth();   // refresh sidebar/diarize/system-audio flags now models are up
+    }
+    if(d.working){
+      if(!d.ready) setupWasBlocking = true;
+      setupPollTimer = setTimeout(checkSetupStatus, 1200);
+      return;
     }
     setupPollTimer = setTimeout(checkSetupStatus, 20000);   // slow watch (e.g. after a model-tier switch)
   }catch(e){
@@ -1031,7 +1113,7 @@ function showRecorder(){
   const sel=document.getElementById('template-select'); if(sel) sel.value=curTemplate;
   setRecSource(recSource);
   const sc=document.querySelector('.content'); if(sc) sc.scrollTop=0;
-  applySetupVisibility(modelsReady);
+  renderSetup(lastSetup);
   startWaveform();
   checkOrphanRecordings();
   updateRecPill();
@@ -1052,7 +1134,7 @@ function returnToRecording(){
   document.querySelectorAll('.note-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('content').innerHTML = recorderShellHTML();
   const sel=document.getElementById('template-select'); if(sel) sel.value=curTemplate;
-  applySetupVisibility(modelsReady);
+  renderSetup(lastSetup);
   document.getElementById('recorder-card').classList.add('compact');
   const btnRec=document.getElementById('btn-rec');
   btnRec.innerHTML=icon('square'); btnRec.classList.add('live'); btnRec.title='Stop';
@@ -1382,6 +1464,7 @@ async function finishProcessing(noteId, job_id, scratch, template){
     return;
   }
   await patchNote(noteId,{transcript, segments});
+  await waitForNotesAI(()=>setProcProgress('Transcript saved — writing notes as soon as the AI notes finish downloading…',100));
 
   if((scratch||'').trim()){
     setProcProgress('Enhancing your notes…',100);
@@ -1395,6 +1478,17 @@ async function finishProcessing(noteId, job_id, scratch, template){
   }
   await patchNote(noteId,{status:'ready'});
   await loadNotes(); reRenderNote(noteId);
+}
+
+// Recording works before the notes AI has finished downloading; the notes
+// step waits here until it's loaded (the transcript is already saved).
+async function waitForNotesAI(onWait){
+  let told=false;
+  while(true){
+    try{ if((await fetch('/health').then(r=>r.json())).model_ready) return; }catch(e){}
+    if(!told){ told=true; onWait(); }
+    await new Promise(r=>setTimeout(r,3000));
+  }
 }
 
 /* On page load, reconnect to a meeting that was still processing. */
@@ -1924,7 +2018,6 @@ async function calRecord(){
 async function openSettings(){
   try{
     const s = await fetch('/settings').then(r=>r.json());
-    document.getElementById('set-model').value    = s.whisper_model;
     document.getElementById('set-lang').value     = s.whisper_language || '';
     document.getElementById('set-diarize').checked= !!s.diarize;
     document.getElementById('set-speakers').value = String(s.num_speakers);
@@ -1932,41 +2025,12 @@ async function openSettings(){
     document.getElementById('settings-note').textContent='';
   }catch(e){ showToast('Could not load settings','error'); return; }
   document.getElementById('settings-modal').classList.add('open');
-  checkLangModelHint();
 }
 function closeSettings(){ document.getElementById('settings-modal').classList.remove('open'); }
 document.getElementById('settings-modal').addEventListener('click', e=>{ if(e.target.id==='settings-modal') closeSettings(); });
 
-// Whisper's accuracy is heavily weighted toward English — non-English languages,
-// especially non-Latin-script ones, need a bigger model to be usable. Warn (and
-// offer a one-click fix) instead of letting people silently get bad transcripts.
-const LANG_NAMES = {hi:'Hindi', ur:'Urdu', ar:'Arabic', zh:'Chinese', ja:'Japanese',
-  ko:'Korean', ru:'Russian', tr:'Turkish', es:'Spanish', fr:'French', de:'German',
-  pt:'Portuguese', it:'Italian', nl:'Dutch'};
-// Languages where "small" is well known to struggle noticeably — non-Latin scripts
-// and other lower-resource languages benefit most from a bigger model.
-const LANG_NEEDS_BIGGER_MODEL = new Set(['hi','ur','ar','zh','ja','ko']);
-
-function checkLangModelHint(){
-  const lang = document.getElementById('set-lang')?.value;
-  const model = document.getElementById('set-model')?.value;
-  const hint = document.getElementById('lang-model-hint');
-  if(!hint) return;
-  if(!lang || lang==='en' || (model!=='tiny' && model!=='base' && model!=='small')){
-    hint.style.display='none'; return;
-  }
-  const name = LANG_NAMES[lang] || 'this language';
-  const strong = LANG_NEEDS_BIGGER_MODEL.has(lang);
-  hint.style.display='block';
-  hint.innerHTML = strong
-    ? `⚠️ Whisper's "${model}" model is tuned mainly for English and transcribes ${name} noticeably worse. `
-      + `For usable accuracy, switch <b>Transcription accuracy</b> to Medium or Large-v3.`
-    : `Note: non-English languages like ${name} are generally more accurate on Medium or Large-v3 than on "${model}".`;
-}
-
 async function saveSettings(){
   const body = {
-    whisper_model:    document.getElementById('set-model').value,
     whisper_language: document.getElementById('set-lang').value,
     diarize:          document.getElementById('set-diarize').checked,
     num_speakers:     parseInt(document.getElementById('set-speakers').value),

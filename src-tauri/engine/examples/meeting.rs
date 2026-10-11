@@ -13,7 +13,7 @@ fn main() -> anyhow::Result<()> {
     let first = args.first().expect("usage: meeting <audio.wav> [system.wav]");
 
     let models = paths::models_dir();
-    let asr = asr::Asr::load(&asr::ModelPaths::new(&models, "small"), "")?;
+    let asr = asr::Asr::load(&asr::ModelPaths::new(&models), "")?;
     let diarizer = Diarizer::load(&models, DiarizeConfig::default())?;
 
     let t0 = Instant::now();

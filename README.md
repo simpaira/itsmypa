@@ -100,7 +100,8 @@ web server, nothing listening on the network.
   Your mic is labelled "You"; the computer audio is diarized into Speaker 2, 3…
 - **Notes**: a local GGUF model via **llama.cpp** (Metal on Apple Silicon)
   writes the summary, chat answers, follow-up email and "enhance my notes".
-  Qwen2.5 3B by default; Gemma 4 E4B is available for better notes.
+  The models are fixed — Whisper "small" and Qwen2.5 3B, the best balance for an
+  average computer — so there's nothing to choose or tune.
 - **Storage**: meetings live in one SQLite file with full-text search.
 
 Long recordings are transcribed as background jobs; if ItsMyPA quits mid-
@@ -118,8 +119,8 @@ cargo test -p itsmypa-engine -p itsmypa-capture   # tests
 
 Models download on first launch into the app-data folder (macOS:
 `~/Library/Application Support/ItsMyPA`, Windows: `%LOCALAPPDATA%\ItsMyPA`) and
-are verified by checksum. Settings (Whisper size, language, speaker detection,
-notes model, calendar) are in the app's Settings screen.
+are verified by checksum. Settings (spoken language, speaker detection,
+calendar) are in the app's Settings screen.
 
 ## Build the desktop app
 

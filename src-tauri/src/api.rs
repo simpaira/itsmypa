@@ -52,6 +52,11 @@ pub fn handle(state: &AppState, method: &str, path: &str, body: Option<Value>) -
     match (method, segs.as_slice()) {
         ("GET", ["health"]) => health(state),
         ("GET", ["setup", "status"]) => setup_status(state),
+        ("POST", ["setup", "retry"]) => {
+            // Downloads resume where they stopped.
+            state.load_models();
+            Ok(json!({"ok": true}))
+        }
 
         ("GET", ["notes"]) => to_json(state.store.list()?),
         ("POST", ["notes"]) => to_json(state.store.create(parse::<Note>(body)?)?),
@@ -186,10 +191,9 @@ fn transcribe(state: &AppState, body: Option<Value>) -> ApiResult {
 }
 
 fn health(state: &AppState) -> ApiResult {
-    let s = state.settings();
     let m = &state.models;
     Ok(json!({
-        "whisper": s.whisper_model,
+        "whisper": "small",
         "engine": "itsmypa-rust",
         "loading": state.models_loading(),
         "asr_ready": m.asr.lock().unwrap().is_some(),
@@ -202,22 +206,81 @@ fn health(state: &AppState) -> ApiResult {
 }
 
 fn setup_status(state: &AppState) -> ApiResult {
+    use crate::state::Component;
     let components = state.setup.lock().unwrap().clone();
     let terminal = |s: &str| matches!(s, "ready" | "error" | "skipped");
-    let pct = |c: &crate::state::Component| match c.status {
-        "ready" | "skipped" | "error" => 100.0,
-        "downloading" | "extracting" if c.total > 0 => (c.bytes as f64 / c.total as f64 * 100.0).min(99.0),
-        _ => 0.0,
+
+    // Bytes of the still-needed downloads that are done. A model that's
+    // downloaded (unpacking/loading/ready) counts fully; a failed one keeps
+    // what it got (downloads resume).
+    let done = |c: &Component| match c.status {
+        "ready" | "skipped" | "verifying" | "extracting" | "loading" => c.size,
+        // The downloader reports totals including a resumed part.
+        _ => c.bytes.saturating_sub(c.resumed).min(c.size),
     };
-    // Recording only truly needs transcription and the notes AI to reach a
-    // terminal state; diarization is optional and degrades gracefully.
-    let ready = components.iter().filter(|c| c.id == "asr" || c.id == "llm").all(|c| terminal(c.status));
-    let overall = if components.is_empty() { 100.0 } else { components.iter().map(pct).sum::<f64>() / components.len() as f64 };
+    let total_bytes: u64 = components.iter().map(|c| c.size).sum();
+    let done_bytes: u64 = components.iter().map(done).sum();
+    let working = components.iter().any(|c| !terminal(c.status));
+    let overall = if total_bytes == 0 {
+        if working { 99.0 } else { 100.0 }
+    } else {
+        let pct = done_bytes as f64 / total_bytes as f64 * 100.0;
+        if working { pct.min(99.0) } else { pct }
+    };
+
+    // Recording only needs transcription. The notes AI can still be
+    // downloading: notes are written as soon as it's ready. Diarization is
+    // optional and degrades gracefully.
+    let status_of = |id: &str| components.iter().find(|c| c.id == id).map(|c| c.status);
+    let ready = status_of("asr") == Some("ready");
+    let notes_ready = status_of("llm") == Some("ready");
+
+    // Three plain steps for the screen instead of five model files.
+    let steps: Vec<Value> = [("asr", "Transcription", &["vad", "asr"][..]), ("seg", "Speaker detection", &["seg", "emb"][..]), ("llm", "AI notes", &["llm"][..])]
+        .into_iter()
+        .filter_map(|(id, label, parts)| {
+            let parts: Vec<&Component> = components.iter().filter(|c| parts.contains(&c.id)).collect();
+            if parts.is_empty() {
+                return None;
+            }
+            let any = |s: &str| parts.iter().any(|c| c.status == s);
+            let status = if any("error") {
+                "error"
+            } else if any("extracting") {
+                "extracting"
+            } else if any("verifying") {
+                "verifying"
+            } else if any("downloading") {
+                "downloading"
+            } else if any("loading") {
+                "loading"
+            } else if any("pending") {
+                "pending"
+            } else if parts.iter().all(|c| c.status == "skipped") {
+                "skipped"
+            } else {
+                "ready"
+            };
+            Some(json!({
+                "id": id,
+                "label": label,
+                "status": status,
+                "bytes": parts.iter().map(|c| done(c)).sum::<u64>(),
+                "total": parts.iter().map(|c| c.size).sum::<u64>(),
+                "error": parts.iter().find_map(|c| c.error.clone()),
+            }))
+        })
+        .collect();
+
     Ok(json!({
         "ready": ready,
+        "notes_ready": notes_ready,
+        "working": working,
         "has_error": components.iter().any(|c| c.status == "error"),
         "overall_percent": (overall * 10.0).round() / 10.0,
-        "components": components,
+        "done_bytes": done_bytes,
+        "total_bytes": total_bytes,
+        "components": steps,
     }))
 }
 
